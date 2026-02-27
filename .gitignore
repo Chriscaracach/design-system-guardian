@@ -1,0 +1,38 @@
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backups created by tool
+.css_tool_backup/
+
+# Session files
+.css_tool_session.json
+
+# Reports
+.css_tool_report.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test fixtures
+test_project/
