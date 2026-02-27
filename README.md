@@ -28,16 +28,17 @@
 git clone <repo-url>
 cd ds-guardian
 
-# Create and activate a virtual environment
+# Create a virtual environment and install
 python -m venv venv
 source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+pip install -e .
 
 # Verify setup
-python tool.py --check-setup
+dsg --check-setup
 ```
+
+This installs the `dsg` command globally via `~/.local/bin`. If that directory
+isn't on your PATH yet, add it to your shell config (fish: `fish_add_path ~/.local/bin`).
 
 ---
 
@@ -45,25 +46,25 @@ python tool.py --check-setup
 
 ```bash
 # Refactor the current directory
-python tool.py start
+dsg start
 
 # Refactor a specific project
-python tool.py start /path/to/your/project
+dsg start /path/to/your/project
 
 # Preview changes without writing files
-python tool.py start --dry-run
+dsg start --dry-run
 
 # Apply all changes without manual review
-python tool.py start --auto-apply
+dsg start --auto-apply
 
 # Use a different AI model
-python tool.py start --model qwen2.5-coder:1.5b
+dsg start --model qwen2.5-coder:1.5b
 
 # Use a custom rules file
-python tool.py start --rules /path/to/my-tokens.md
+dsg start --rules /path/to/my-tokens.md
 
 # Verify your environment
-python tool.py --check-setup
+dsg --check-setup
 ```
 
 ---
@@ -76,20 +77,24 @@ Format your tokens under section headers that describe their category:
 
 ```markdown
 ## Colors
+
 --primary: #2563eb
 --gray-900: #111827
 --white: #ffffff
 
 ## Spacing
+
 --space-1: 4px
 --space-2: 8px
 --space-4: 16px
 
 ## Typography
+
 --text-sm: 0.875rem
 --font-bold: 700
 
 ## Borders
+
 --radius-md: 6px
 --radius-full: 9999px
 ```
@@ -102,16 +107,16 @@ DS Guardian auto-detects the category from the header name and filters tokens to
 
 During review, for each changed file you see a **side-by-side diff** (original left, refactored right) alongside the rules file for reference.
 
-| Key | Action |
-|-----|--------|
-| `1` | Accept this change |
-| `2` | Reject this change |
-| `3` | Skip (decide later) |
-| `4` | Accept all remaining |
-| `5` / `q` | Save and quit |
-| `↑` / `k` | Scroll up |
-| `↓` / `j` | Scroll down |
-| `Tab` | Switch between diff and rules panels |
+| Key       | Action                               |
+| --------- | ------------------------------------ |
+| `1`       | Accept this change                   |
+| `2`       | Reject this change                   |
+| `3`       | Skip (decide later)                  |
+| `4`       | Accept all remaining                 |
+| `5` / `q` | Save and quit                        |
+| `↑` / `k` | Scroll up                            |
+| `↓` / `j` | Scroll down                          |
+| `Tab`     | Switch between diff and rules panels |
 
 ---
 

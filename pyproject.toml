@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ds-guardian"
+version = "0.1.0"
+description = "AI-powered CSS design system token refactoring tool"
+requires-python = ">=3.10"
+dependencies = [
+    "rich>=13.0.0",
+    "requests>=2.31.0",
+    "Pillow>=10.0.0",
+]
+
+[project.scripts]
+dsg = "css_tool.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["css_tool*"]
