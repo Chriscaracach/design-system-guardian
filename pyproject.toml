@@ -14,8 +14,8 @@ dependencies = [
 ]
 
 [project.scripts]
-dsg = "css_tool.cli:main"
+dsg = "ds_guardian.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["css_tool*"]
+include = ["ds_guardian*"]

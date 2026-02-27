@@ -9,16 +9,16 @@ from rich.console import Console
 from rich.prompt import Confirm
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from css_tool.core.scanner import FileScanner, format_size
-from css_tool.core.rules import RulesParser
-from css_tool.core.session import RefactoringSession, FileChange
-from css_tool.core.writer import FileWriter
-from css_tool.ai.client import OllamaClient
-from css_tool.ai.refactorer import CSSRefactorer
-from css_tool.ai.optimizer import PromptOptimizer
-from css_tool.ui.diff import DiffGenerator
-from css_tool.ui.review import InteractiveReviewer
-from css_tool.ui.splash import SplashScreen
+from ds_guardian.core.scanner import FileScanner, format_size
+from ds_guardian.core.rules import RulesParser
+from ds_guardian.core.session import RefactoringSession, FileChange
+from ds_guardian.core.writer import FileWriter
+from ds_guardian.ai.client import OllamaClient
+from ds_guardian.ai.refactorer import CSSRefactorer
+from ds_guardian.ai.optimizer import PromptOptimizer
+from ds_guardian.ui.diff import DiffGenerator
+from ds_guardian.ui.review import InteractiveReviewer
+from ds_guardian.ui.splash import SplashScreen
 
 
 class RefactoringWorkflow:
@@ -129,7 +129,7 @@ class RefactoringWorkflow:
             self.console.print("\n\n[yellow]✗ Interrupted by user[/yellow]")
             # Save session before exiting
             self.session.save()
-            self.console.print(f"[yellow]Session saved. Resume with: python tool.py review[/yellow]")
+            self.console.print(f"[yellow]Session saved. Resume with: dsg review[/yellow]")
             return False
         except Exception as e:
             self.console.print(f"\n[red]✗ Error: {e}[/red]")
@@ -313,7 +313,7 @@ class RefactoringWorkflow:
         elif stats['accepted'] > 0:
             backup_size = self.writer.get_backup_size()
             self.console.print(f"\nBackup size: {format_size(backup_size)}")
-            self.console.print(f"Backup location: [cyan].css_tool_backup/[/cyan]")
+            self.console.print(f"Backup location: [cyan].ds_guardian_backup/[/cyan]")
         
         # Clean up session file
         self.session.clear()

@@ -35,7 +35,7 @@ class FileChange:
 class RefactoringSession:
     """Manages a refactoring session with multiple files"""
     
-    def __init__(self, session_file: str = '.css_tool_session.json'):
+    def __init__(self, session_file: str = '.ds_guardian_session.json'):
         """
         Initialize session
         
@@ -69,7 +69,7 @@ class RefactoringSession:
             json.dump(data, f, indent=2)
     
     @classmethod
-    def load(cls, session_file: str = '.css_tool_session.json'):
+    def load(cls, session_file: str = '.ds_guardian_session.json'):
         """Load session from file"""
         session = cls(session_file)
         

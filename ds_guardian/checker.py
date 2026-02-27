@@ -187,7 +187,7 @@ class SetupChecker:
         
         # Check if we can create directories
         try:
-            test_dir = current_dir / ".css_tool_test"
+            test_dir = current_dir / ".ds_guardian_test"
             test_dir.mkdir(exist_ok=True)
             test_dir.rmdir()
             self.success("Can create backup directories")
@@ -213,7 +213,7 @@ class SetupChecker:
         
         if not self.issues:
             self.console.print("\n✓ All checks passed! Ready to use.\n", style="bold green")
-            self.console.print("Run 'python tool.py start' to begin refactoring.")
+            self.console.print("Run 'dsg start' to begin refactoring.")
         else:
             self.console.print(f"\n✗ {len(self.issues)} issue(s) found.\n", style="bold red")
             
@@ -229,7 +229,7 @@ class SetupChecker:
                 self.console.print("\n" + "━" * 50, style="dim")
             
             self.console.print("\nAfter running these commands, verify with:")
-            self.console.print("  python tool.py --check-setup", style="bold")
+            self.console.print("  dsg --check-setup", style="bold")
     
     def generate_fix_commands(self):
         """Generate copy-pastable fix commands"""

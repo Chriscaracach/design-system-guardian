@@ -14,11 +14,11 @@ from typing import List
 from pathlib import Path
 import os
 
-from css_tool.ui.components import DiffViewer, ButtonMenu, StatusDisplay
-from css_tool.ui.diff import DiffGenerator
-from css_tool.core.session import FileChange
-from css_tool.ui.side_by_side import SideBySideDiff, ThreeRowLayout
-from css_tool.ui.pager import InteractivePager
+from ds_guardian.ui.components import DiffViewer, ButtonMenu, StatusDisplay
+from ds_guardian.ui.diff import DiffGenerator
+from ds_guardian.core.session import FileChange
+from ds_guardian.ui.side_by_side import SideBySideDiff, ThreeRowLayout
+from ds_guardian.ui.pager import InteractivePager
 
 
 class InteractiveReviewer:

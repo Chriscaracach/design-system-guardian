@@ -122,7 +122,7 @@ During review, for each changed file you see a **side-by-side diff** (original l
 
 ## Backups
 
-Every accepted change creates a timestamped backup under `.css_tool_backup/` before writing. You can safely re-run the tool.
+Every accepted change creates a timestamped backup under `.ds_guardian_backup/` before writing. You can safely re-run the tool.
 
 ---
 
@@ -130,10 +130,10 @@ Every accepted change creates a timestamped backup under `.css_tool_backup/` bef
 
 ```
 ds-guardian/
-├── tool.py              # CLI entry point
+├── main.py              # CLI entry point (legacy, prefer dsg)
 ├── rules.md             # Your design token definitions
 ├── requirements.txt
-└── css_tool/
+└── ds_guardian/
     ├── checker.py       # Setup verification
     ├── workflow.py      # Main orchestration
     ├── core/

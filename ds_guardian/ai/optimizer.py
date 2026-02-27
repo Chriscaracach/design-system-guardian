@@ -5,7 +5,7 @@ Analyzes CSS content and filters relevant design tokens to reduce prompt size
 
 import re
 from typing import Dict, List, Set
-from css_tool.core.rules import RefactoringRules, DesignToken
+from ds_guardian.core.rules import RefactoringRules, DesignToken
 
 
 class PromptOptimizer:

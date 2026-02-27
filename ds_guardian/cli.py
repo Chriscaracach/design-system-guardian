@@ -95,14 +95,14 @@ Examples:
 
     # Handle check-setup command
     if args.check_setup or args.command == 'check-setup':
-        from css_tool.checker import SetupChecker
+        from ds_guardian.checker import SetupChecker
         checker = SetupChecker()
         checker.check_all()
         return
 
     # Handle start command
     if args.command == 'start':
-        from css_tool.workflow import RefactoringWorkflow
+        from ds_guardian.workflow import RefactoringWorkflow
 
         workflow = RefactoringWorkflow(
             target_dir=args.target,

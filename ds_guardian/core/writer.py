@@ -28,7 +28,7 @@ class WriteResult:
 class FileWriter:
     """Handles writing refactored CSS files with backup support"""
     
-    def __init__(self, backup_dir: str = '.css_tool_backup'):
+    def __init__(self, backup_dir: str = '.ds_guardian_backup'):
         """
         Initialize file writer
         

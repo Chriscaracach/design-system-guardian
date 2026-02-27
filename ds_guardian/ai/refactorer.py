@@ -4,7 +4,7 @@ Handles CSS refactoring using AI
 """
 
 from typing import Dict
-from css_tool.ai.client import OllamaClient, RefactoringResult
+from ds_guardian.ai.client import OllamaClient, RefactoringResult
 
 
 class CSSRefactorer:
