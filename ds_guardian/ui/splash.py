@@ -8,6 +8,8 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.align import Align
 from rich.layout import Layout
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+from rich.table import Table
 from rich import box
 from rich.live import Live
 import time
@@ -27,7 +29,35 @@ class SplashScreen:
         """
         self.console = console
         self.splash_image_path = Path(__file__).parent.parent.parent / "splash.png"
+        self._status_message = "Initializing"
+        self._files_total = 0
+        self._files_done = 0
+        self._status_lock = threading.Lock()
     
+    def set_status(self, message: str):
+        """
+        Update the status label shown on the splash screen.
+        Safe to call from background threads.
+
+        Args:
+            message: Short description of what the app is currently doing
+        """
+        with self._status_lock:
+            self._status_message = message
+
+    def set_progress(self, done: int, total: int):
+        """
+        Update the file processing counters shown on the splash screen.
+        Safe to call from background threads.
+
+        Args:
+            done: Number of files processed so far
+            total: Total number of files to process
+        """
+        with self._status_lock:
+            self._files_done = done
+            self._files_total = total
+
     def show(self, duration: float = 5.0, background_task=None):
         """
         Show splash screen for specified duration
@@ -64,7 +94,11 @@ class SplashScreen:
                 remaining = duration - elapsed
                 
                 # Update progress indicator
-                layout = self._create_splash_layout(remaining)
+                with self._status_lock:
+                    current_status = self._status_message
+                    files_done = self._files_done
+                    files_total = self._files_total
+                layout = self._create_splash_layout(remaining, duration, current_status, files_done, files_total)
                 live.update(layout)
                 
                 # Check if background task is done
@@ -92,12 +126,23 @@ class SplashScreen:
         
         return result[0]
     
-    def _create_splash_layout(self, remaining: float = None) -> Layout:
+    def _create_splash_layout(
+        self,
+        remaining: float = None,
+        duration: float = None,
+        status: str = None,
+        files_done: int = 0,
+        files_total: int = 0,
+    ) -> Layout:
         """
         Create splash screen layout
         
         Args:
             remaining: Seconds remaining (for progress indicator)
+            duration: Total duration in seconds
+            status: Current status label
+            files_done: Number of files processed so far
+            files_total: Total files to process
         
         Returns:
             Rich Layout
@@ -107,33 +152,55 @@ class SplashScreen:
         # Try to load and display image
         image_content = self._load_image()
         
-        # Create welcome text
-        welcome_text = Text()
-        welcome_text.append("\n")
-        welcome_text.append("CSS Design Token Refactoring Tool", style="bold cyan")
-        welcome_text.append("\n\n")
-        welcome_text.append("Automatically refactor your CSS to use design tokens", style="white")
-        welcome_text.append("\n")
-        welcome_text.append("from your design system rules", style="white")
-        welcome_text.append("\n\n")
-        
-        if remaining is not None:
-            dots = "." * (int(time.time() * 2) % 4)
-            welcome_text.append(f"Processing with AI{dots}", style="dim yellow")
-        
-        # Combine image and text
-        content = Text()
+        # Build a vertical stack: image/logo + optional progress section
+        grid = Table.grid(padding=(0, 0))
+        grid.add_column(justify="center")
+
         if image_content:
-            content.append(image_content)
-            content.append("\n\n")
-        content.append(welcome_text)
-        
-        # Center everything
-        centered = Align.center(content, vertical="middle")
+            grid.add_row(Align.center(image_content))
+            grid.add_row(Text(""))
+
+        if remaining is not None and duration is not None:
+            elapsed = duration - remaining
+
+            if files_total > 0:
+                # File-based progress bar
+                file_progress = Progress(
+                    TextColumn("[bold cyan]{task.description}"),
+                    BarColumn(bar_width=40, style="cyan", complete_style="bold cyan"),
+                    TextColumn("[cyan]{task.completed}/{task.total}"),
+                    expand=False,
+                )
+                file_progress.add_task("Files", total=files_total, completed=files_done)
+                grid.add_row(Align.center(file_progress))
+
+                # ETA based on per-file rate
+                if files_done > 0 and files_done < files_total:
+                    rate = elapsed / files_done  # seconds per file
+                    eta = rate * (files_total - files_done)
+                    eta_text = Text(f"ETA  ~{eta:.0f}s", style="dim cyan", justify="center")
+                else:
+                    eta_text = Text("", justify="center")
+                grid.add_row(Align.center(eta_text))
+            else:
+                # Fallback time-based progress bar
+                time_progress = Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(bar_width=40, style="cyan", complete_style="bold cyan"),
+                    TextColumn("[cyan]{task.percentage:>3.0f}%"),
+                    expand=False,
+                )
+                time_progress.add_task("", total=duration, completed=elapsed)
+                grid.add_row(Align.center(time_progress))
+                grid.add_row(Text(""))
+
+            label = status or "Working..."
+            status_text = Text(f"{label}", style="dim cyan", justify="center")
+            grid.add_row(Align.center(status_text))
         
         layout.update(
             Panel(
-                centered,
+                Align.center(grid, vertical="middle"),
                 border_style="cyan",
                 box=box.DOUBLE,
                 padding=(2, 4)
@@ -204,16 +271,12 @@ class SplashScreen:
             Text with ASCII art
         """
         logo = Text()
-        logo.append("""
-   ╔═══════════════════════════════════════╗
-   ║                                       ║
-   ║     CSS DESIGN TOKEN REFACTORING      ║
-   ║                                       ║
-   ║          ╭─────────────────╮          ║
-   ║          │   .css  →  var  │          ║
-   ║          ╰─────────────────╯          ║
-   ║                                       ║
-   ╚═══════════════════════════════════════╝
+        logo.append(r"""
+|------------------|
+|                  |
+|   DS  GUARDIAN   |
+|                  |
+|------------------|
         """, style="bold cyan")
         
         return logo

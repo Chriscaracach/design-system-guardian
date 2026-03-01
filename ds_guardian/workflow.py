@@ -64,35 +64,29 @@ class RefactoringWorkflow:
             def background_processing():
                 """Run initialization and processing in background"""
                 try:
+                    splash.set_status("Scanning CSS files...")
                     if not self._scan_files():
-                        print("DEBUG: _scan_files failed")
                         return False
-                    print(f"DEBUG: Scanned {len(self.files)} files")
                     
+                    splash.set_status("Loading design tokens...")
                     if not self._load_rules():
-                        print("DEBUG: _load_rules failed")
                         return False
-                    print(f"DEBUG: Loaded {self.rules.get_token_count()} tokens")
                     
+                    splash.set_status("Connecting to AI model...")
                     try:
                         if not self._initialize_ai():
-                            print("DEBUG: _initialize_ai returned False")
                             return False
-                        print("DEBUG: AI initialized")
                     except Exception as e:
-                        print(f"DEBUG: _initialize_ai raised exception: {e}")
-                        import traceback
-                        traceback.print_exc()
                         return False
                     
-                    if not self._process_all_files():
-                        print("DEBUG: _process_all_files failed")
+                    splash.set_status("Processing files...")
+                    splash.set_progress(0, len(self.files))
+                    if not self._process_all_files(splash):
                         return False
-                    print(f"DEBUG: Processed {len(self.session.changes)} changes")
                     
+                    splash.set_status(f"Done — {len(self.session.changes)} files with changes")
                     return True
                 except Exception as e:
-                    print(f"DEBUG: Exception in background_processing: {e}")
                     import traceback
                     traceback.print_exc()
                     return False
@@ -181,7 +175,7 @@ class RefactoringWorkflow:
             traceback.print_exc()
             return False
     
-    def _process_all_files(self):
+    def _process_all_files(self, splash=None):
         """Process all files individually with optimized prompts (runs silently in background)"""
         # Collect all CSS content for token optimization
         all_css_content = ""
@@ -196,7 +190,11 @@ class RefactoringWorkflow:
         design_tokens = RulesParser(self.rules_file).generate_prompt_context(filtered_rules)
         
         # Process files individually
-        for file in self.files:
+        for idx, file in enumerate(self.files):
+            if splash:
+                splash.set_status(f"Processing {file.relative_path}")
+                splash.set_progress(idx, len(self.files))
+
             # Read file content
             with open(file.path, 'r', encoding='utf-8') as f:
                 original_css = f.read()
@@ -227,6 +225,9 @@ class RefactoringWorkflow:
             )
             
             self.session.add_change(change)
+
+        if splash:
+            splash.set_progress(len(self.files), len(self.files))
         
         if len(self.session.changes) == 0:
             return False
