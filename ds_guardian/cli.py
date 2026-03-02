@@ -27,7 +27,7 @@ Examples:
     parser.add_argument(
         'command',
         nargs='?',
-        choices=['start', 'check-setup'],
+        choices=['start', 'check-setup', 'review'],
         help='Command to run'
     )
 
@@ -96,9 +96,26 @@ Examples:
     # Handle check-setup command
     if args.check_setup or args.command == 'check-setup':
         from ds_guardian.checker import SetupChecker
-        checker = SetupChecker()
+        checker = SetupChecker(model=args.model)
         checker.check_all()
         return
+
+    ascii_only = args.no_gifs or args.ascii_only
+
+    # Handle review command — resume a saved session
+    if args.command == 'review':
+        from ds_guardian.workflow import RefactoringWorkflow
+        workflow = RefactoringWorkflow(
+            target_dir=args.target,
+            rules_file=args.rules,
+            dry_run=args.dry_run,
+            auto_apply=args.auto_apply,
+            max_workers=args.workers,
+            model=args.model,
+            ascii_only=ascii_only
+        )
+        success = workflow.resume()
+        sys.exit(0 if success else 1)
 
     # Handle start command
     if args.command == 'start':
@@ -110,7 +127,8 @@ Examples:
             dry_run=args.dry_run,
             auto_apply=args.auto_apply,
             max_workers=args.workers,
-            model=args.model
+            model=args.model,
+            ascii_only=ascii_only
         )
 
         success = workflow.run()

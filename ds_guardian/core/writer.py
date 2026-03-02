@@ -36,6 +36,7 @@ class FileWriter:
             backup_dir: Directory for backups (relative to project root)
         """
         self.backup_dir = backup_dir
+        self._session_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     def write(self, file_path: Path, content: str, create_backup: bool = True) -> WriteResult:
         """
@@ -105,11 +106,10 @@ class FileWriter:
         try:
             # Create backup directory structure
             backup_root = Path.cwd() / self.backup_dir
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             
-            # Preserve directory structure in backup
+            # Preserve directory structure in backup (all files share one session timestamp)
             relative_path = file_path.relative_to(Path.cwd())
-            backup_path = backup_root / timestamp / relative_path
+            backup_path = backup_root / self._session_timestamp / relative_path
             
             # Create parent directories
             backup_path.parent.mkdir(parents=True, exist_ok=True)

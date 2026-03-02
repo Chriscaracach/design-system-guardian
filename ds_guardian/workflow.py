@@ -4,6 +4,8 @@ Orchestrates the entire refactoring process
 """
 
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from rich.console import Console
 from rich.prompt import Confirm
@@ -24,7 +26,7 @@ from ds_guardian.ui.splash import SplashScreen
 class RefactoringWorkflow:
     """Manages a complete refactoring workflow"""
     
-    def __init__(self, target_dir: str, rules_file: str, dry_run: bool = False, auto_apply: bool = False, max_workers: int = 3, model: str = 'qwen2.5-coder:0.5b'):
+    def __init__(self, target_dir: str, rules_file: str, dry_run: bool = False, auto_apply: bool = False, max_workers: int = 3, model: str = 'qwen2.5-coder:0.5b', ascii_only: bool = False):
         """
         Initialize refactoring workflow
         
@@ -34,7 +36,8 @@ class RefactoringWorkflow:
             dry_run: Preview only, don't write files
             auto_apply: Apply all changes without review
             max_workers: Number of parallel workers for AI processing (default: 3)
-            model: Ollama model to use (default: llama3.2:3b)
+            model: Ollama model to use
+            ascii_only: Disable image/GIF rendering, use ASCII art only
         """
         self.target_dir = Path(target_dir)
         self.rules_file = rules_file
@@ -42,6 +45,7 @@ class RefactoringWorkflow:
         self.auto_apply = auto_apply
         self.max_workers = max_workers
         self.model = model
+        self.ascii_only = ascii_only
         
         self.console = Console()
         self.scanner = FileScanner(target_dir)
@@ -54,12 +58,22 @@ class RefactoringWorkflow:
         self.rules = None
         self.client = None
         self.refactorer = None
+        self._bg_error = None
     
     def run(self):
         """Run the complete refactoring workflow"""
         try:
+            # Check for existing session and offer to resume
+            if self.session.exists():
+                self.console.print("[yellow]⚠ A saved session was found.[/yellow]")
+                if Confirm.ask("Resume previous session instead of starting fresh?", default=True):
+                    return self.resume()
+                else:
+                    self.session.clear()
+                    self.session = RefactoringSession()
+
             # Show splash screen while processing in background
-            splash = SplashScreen(self.console)
+            splash = SplashScreen(self.console, ascii_only=self.ascii_only)
             
             def background_processing():
                 """Run initialization and processing in background"""
@@ -73,22 +87,19 @@ class RefactoringWorkflow:
                         return False
                     
                     splash.set_status("Connecting to AI model...")
-                    try:
-                        if not self._initialize_ai():
-                            return False
-                    except Exception as e:
+                    if not self._initialize_ai():
                         return False
                     
                     splash.set_status("Processing files...")
                     splash.set_progress(0, len(self.files))
-                    if not self._process_all_files(splash):
-                        return False
+                    result = self._process_all_files(splash)
+                    if result == 'no_changes':
+                        return 'no_changes'
                     
                     splash.set_status(f"Done — {len(self.session.changes)} files with changes")
                     return True
                 except Exception as e:
-                    import traceback
-                    traceback.print_exc()
+                    self._bg_error = str(e)
                     return False
             
             # Show splash while processing (up to 60 seconds)
@@ -97,8 +108,15 @@ class RefactoringWorkflow:
             # Clear screen after splash
             self.console.clear()
             
+            if success == 'no_changes':
+                self.console.print("[yellow]No refactorable values found — the CSS may already use design tokens, or no token values matched.[/yellow]")
+                return True
+            
             if not success:
-                self.console.print("[red]✗ Initialization failed during splash screen[/red]")
+                if self._bg_error:
+                    self.console.print(f"[red]✗ {self._bg_error}[/red]")
+                else:
+                    self.console.print("[red]✗ Initialization failed. Run 'dsg --check-setup' to diagnose.[/red]")
                 return False
             
             # Show what was processed
@@ -135,10 +153,12 @@ class RefactoringWorkflow:
         """Scan for CSS files (silent for background processing)"""
         try:
             self.files = self.scanner.scan()
-        except Exception:
+        except Exception as e:
+            self._bg_error = f"Failed to scan directory: {e}"
             return False
         
         if not self.files:
+            self._bg_error = f"No CSS/SCSS/LESS files found in: {self.target_dir}"
             return False
         
         return True
@@ -148,7 +168,15 @@ class RefactoringWorkflow:
         try:
             parser = RulesParser(self.rules_file)
             self.rules = parser.parse()
-        except Exception:
+        except FileNotFoundError:
+            self._bg_error = f"Rules file not found: '{self.rules_file}' — pass --rules <path> to specify a different file."
+            return False
+        except Exception as e:
+            self._bg_error = f"Failed to load rules: {e}"
+            return False
+        
+        if self.rules.get_token_count() == 0:
+            self._bg_error = f"No design tokens found in '{self.rules_file}'. Check the file format."
             return False
         
         return True
@@ -156,64 +184,47 @@ class RefactoringWorkflow:
     def _initialize_ai(self) -> bool:
         """Initialize AI client and refactorer (runs silently in background)"""
         try:
-            print(f"DEBUG: Creating OllamaClient with model={self.model}")
             self.client = OllamaClient(model=self.model)
             
-            print("DEBUG: Checking connection...")
             if not self.client.is_available():
-                print("DEBUG: is_available() returned False")
+                self._bg_error = "Could not connect to Ollama. Is it running? Try: ollama serve"
                 return False
             
-            print("DEBUG: Creating CSSRefactorer...")
             self.refactorer = CSSRefactorer(self.client)
-            print("DEBUG: AI initialization complete")
             return True
             
         except Exception as e:
-            print(f"DEBUG: Exception in _initialize_ai: {e}")
-            import traceback
-            traceback.print_exc()
+            self._bg_error = f"AI initialization error: {e}"
             return False
     
+    
     def _process_all_files(self, splash=None):
-        """Process all files individually with optimized prompts (runs silently in background)"""
-        # Collect all CSS content for token optimization
+        """Process all files in parallel using ThreadPoolExecutor"""
         all_css_content = ""
         for file in self.files:
             with open(file.path, 'r', encoding='utf-8') as f:
                 all_css_content += f.read() + "\n"
-        
-        # Filter tokens to only relevant ones
-        filtered_rules = self.optimizer.filter_relevant_tokens(all_css_content, self.rules)
-        
-        # Generate prompt context with filtered tokens
-        design_tokens = RulesParser(self.rules_file).generate_prompt_context(filtered_rules)
-        
-        # Process files individually
-        for idx, file in enumerate(self.files):
-            if splash:
-                splash.set_status(f"Processing {file.relative_path}")
-                splash.set_progress(idx, len(self.files))
 
-            # Read file content
+        filtered_rules = self.optimizer.filter_relevant_tokens(all_css_content, self.rules)
+        design_tokens = RulesParser(self.rules_file).generate_prompt_context(filtered_rules)
+
+        session_lock = threading.Lock()
+        completed_count = [0]
+
+        def process_file(file):
             with open(file.path, 'r', encoding='utf-8') as f:
                 original_css = f.read()
-            
-            # Refactor
+
             result = self.refactorer.refactor(original_css, design_tokens)
-            
             if not result.success:
-                continue
-            
-            # Generate diff stats
+                return None
+
             diff_lines = self.diff_generator.generate(original_css, result.refactored_css)
             diff_stats = self.diff_generator.get_stats(diff_lines)
-            
             if not diff_stats['has_changes']:
-                continue
-            
-            # Create file change record
-            change = FileChange(
+                return None
+
+            return FileChange(
                 file_path=str(file.path),
                 relative_path=str(file.relative_path),
                 original_css=original_css,
@@ -223,17 +234,53 @@ class RefactoringWorkflow:
                 lines_removed=diff_stats['removed'],
                 status='pending'
             )
-            
-            self.session.add_change(change)
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {executor.submit(process_file, file): file for file in self.files}
+            for future in as_completed(futures):
+                file = futures[future]
+                with session_lock:
+                    completed_count[0] += 1
+                    if splash:
+                        splash.set_status(f"Processing {file.relative_path}")
+                        splash.set_progress(completed_count[0], len(self.files))
+                try:
+                    change = future.result()
+                    if change is not None:
+                        with session_lock:
+                            self.session.add_change(change)
+                except Exception:
+                    continue
 
         if splash:
             splash.set_progress(len(self.files), len(self.files))
-        
+
         if len(self.session.changes) == 0:
-            return False
-        
+            return 'no_changes'
+
         return True
-    
+
+    def resume(self):
+        """Resume a previously saved session, skipping AI processing"""
+        try:
+            self.session = RefactoringSession.load()
+        except FileNotFoundError:
+            self.console.print("[red]✗ No saved session found. Run 'dsg start' to begin.[/red]")
+            return False
+        except Exception as e:
+            self.console.print(f"[red]✗ Failed to load session: {e}[/red]")
+            return False
+
+        pending = self.session.get_pending_changes()
+        self.console.print(f"[green]✓ Resumed session: {len(self.session.changes)} files, {len(pending)} pending review[/green]\n")
+
+        if self.auto_apply:
+            self._auto_apply_all()
+        else:
+            self._review_changes()
+
+        return True
+
     def _review_changes(self):
         """Review all changes interactively with three-column layout"""
         # Use interactive reviewer with rules file
@@ -280,7 +327,11 @@ class RefactoringWorkflow:
                 if result.success:
                     self.console.print(f"[green]✓ {change.relative_path}[/green]")
                     if result.backup_path:
-                        self.console.print(f"  [dim]Backup: {result.backup_path.relative_to(Path.cwd())}[/dim]")
+                        try:
+                            backup_display = result.backup_path.relative_to(Path.cwd())
+                        except ValueError:
+                            backup_display = result.backup_path
+                        self.console.print(f"  [dim]Backup: {backup_display}[/dim]")
                     success_count += 1
                 else:
                     self.console.print(f"[red]✗ {change.relative_path}: {result.error}[/red]")

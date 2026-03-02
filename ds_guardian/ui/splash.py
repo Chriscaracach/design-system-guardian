@@ -20,14 +20,16 @@ from pathlib import Path
 class SplashScreen:
     """Displays splash screen with image and welcome text"""
     
-    def __init__(self, console: Console):
+    def __init__(self, console: Console, ascii_only: bool = False):
         """
         Initialize splash screen
         
         Args:
             console: Rich console instance
+            ascii_only: If True, skip image rendering and always use ASCII art
         """
         self.console = console
+        self.ascii_only = ascii_only
         self.splash_image_path = Path(__file__).parent.parent.parent / "splash.png"
         self._status_message = "Initializing"
         self._files_total = 0
@@ -216,8 +218,8 @@ class SplashScreen:
         Returns:
             Text representation of image or ASCII art
         """
-        # Try to display actual image if it exists
-        if self.splash_image_path.exists():
+        # Try to display actual image if it exists (skip if ascii_only)
+        if not self.ascii_only and self.splash_image_path.exists():
             try:
                 # Try to use PIL to convert image to ASCII art
                 from PIL import Image

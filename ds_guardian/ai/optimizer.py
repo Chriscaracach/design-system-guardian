@@ -118,19 +118,8 @@ class PromptOptimizer:
     
     def _is_color_relevant(self, token_value: str, css_colors: Set[str]) -> bool:
         """Check if a color token is relevant to CSS content"""
-        # Normalize token value
         token_lower = token_value.lower().strip()
-        
-        # Check direct match
-        if token_lower in css_colors:
-            return True
-        
-        # Check if it's a hex color in the CSS
-        for css_color in css_colors:
-            if css_color.lower() == token_lower:
-                return True
-        
-        return False
+        return token_lower in {c.lower() for c in css_colors}
     
     def _is_spacing_relevant(self, token_value: str, css_spacing: Set[str]) -> bool:
         """Check if a spacing token is relevant to CSS content"""

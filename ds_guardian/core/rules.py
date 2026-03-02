@@ -104,6 +104,7 @@ class RulesParser:
         current_section = None
         
         lines = content.split('\n')
+        in_code_fence = False
         
         for line in lines:
             line = line.strip()
@@ -112,14 +113,19 @@ class RulesParser:
             if not line or line.startswith('<!--'):
                 continue
             
-            # Check for headers
-            if line.startswith('#'):
+            # Track fenced code blocks — toggle on opening/closing ```
+            if line.startswith('```'):
+                in_code_fence = not in_code_fence
+                continue
+            
+            # Check for headers (only outside code fences)
+            if not in_code_fence and line.startswith('#'):
                 header_text = line.lstrip('#').strip().lower()
                 current_category = self._detect_category(header_text)
                 current_section = header_text
                 continue
             
-            # Parse token definitions
+            # Parse token definitions (works inside and outside code fences)
             # Format: --token-name: value
             # or: token-name: value
             token_match = re.match(r'^(--)?([\w-]+):\s*(.+)$', line)

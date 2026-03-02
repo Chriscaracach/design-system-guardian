@@ -10,8 +10,13 @@ from rich.table import Table
 from rich.live import Live
 from rich import box
 import sys
-import tty
-import termios
+
+try:
+    import tty
+    import termios
+    _HAS_TTY = True
+except ImportError:
+    _HAS_TTY = False
 
 
 class InteractivePager:
@@ -53,7 +58,12 @@ class InteractivePager:
             User's choice (1-5)
         """
         from rich.layout import Layout
-        
+
+        # Reset scroll position for each new file
+        self.scroll_offset = 0
+        self.rules_scroll_offset = 0
+        self.active_panel = 'diff'
+
         # Auto-detect terminal height
         if lines_per_page is None:
             terminal_height = self.console.height
@@ -213,18 +223,23 @@ class InteractivePager:
     
     def _getch(self):
         """Get a single character from stdin"""
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            char = sys.stdin.read(1)
-            
-            # Handle arrow keys (escape sequences)
-            if char == '\x1b':
-                next1 = sys.stdin.read(1)
-                next2 = sys.stdin.read(1)
-                return '\x1b' + next1 + next2
-            
-            return char
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        if _HAS_TTY:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                char = sys.stdin.read(1)
+
+                # Handle arrow keys (escape sequences)
+                if char == '\x1b':
+                    next1 = sys.stdin.read(1)
+                    next2 = sys.stdin.read(1)
+                    return '\x1b' + next1 + next2
+
+                return char
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        else:
+            # Fallback for non-POSIX systems: read a full line and use first char
+            line = input("Choice (1-5, q=quit, j/k=scroll): ").strip()
+            return line[0] if line else '3'

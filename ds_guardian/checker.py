@@ -15,8 +15,9 @@ from rich.panel import Panel
 class SetupChecker:
     """Verifies that the environment is properly set up"""
     
-    def __init__(self):
+    def __init__(self, model: str = 'qwen2.5-coder:0.5b'):
         self.console = Console()
+        self.model = model
         self.issues = []
         self.warnings = []
     
@@ -34,7 +35,7 @@ class SetupChecker:
         
         self.console.print("\n[bold]AI Backend:[/bold]")
         self.check_ollama()
-        self.check_model()
+        self.check_model(self.model)
         
         self.console.print("\n[bold]Terminal Capabilities:[/bold]")
         self.check_terminal()
@@ -122,27 +123,29 @@ class SetupChecker:
             self.error("Ollama service not running")
             self.issues.append("Start Ollama")
     
-    def check_model(self):
-        """Check if Llama 3.2 3B is available"""
+    def check_model(self, model: str = None):
+        """Check if the configured model is available"""
+        target_model = model or self.model
         try:
             import requests
             response = requests.get("http://localhost:11434/api/tags", timeout=2)
             if response.status_code == 200:
                 data = response.json()
                 models = data.get("models", [])
+                available_names = [m.get("name", "") for m in models]
                 
-                # Check for llama3.2:3b or similar
-                found = False
-                for model in models:
-                    model_name = model.get("name", "")
-                    if "llama3.2" in model_name.lower() and "3b" in model_name.lower():
-                        found = True
-                        self.success(f"Llama 3.2 3B model available ({model_name})")
+                # Check for exact match first, then prefix match (e.g. name without tag)
+                found = None
+                for name in available_names:
+                    if name == target_model or name.startswith(target_model.split(':')[0]):
+                        found = name
                         break
                 
-                if not found:
-                    self.error("Llama 3.2 3B model not found")
-                    self.issues.append("Pull model")
+                if found:
+                    self.success(f"Model available: {found}")
+                else:
+                    self.error(f"Model not found: {target_model}")
+                    self.issues.append(f"Pull model: {target_model}")
             else:
                 self.warning("Could not check models (Ollama not responding)")
         except Exception:
@@ -259,10 +262,12 @@ class SetupChecker:
             })
         
         # Check for model
-        if any("Pull model" in issue for issue in self.issues):
+        pull_issues = [issue for issue in self.issues if issue.startswith("Pull model:")]
+        for issue in pull_issues:
+            model_name = issue.split("Pull model:")[-1].strip()
             commands.append({
-                'comment': "# Pull the AI model (~2GB download)",
-                'command': "ollama pull llama3.2:3b"
+                'comment': f"# Pull the AI model",
+                'command': f"ollama pull {model_name}"
             })
         
         return commands
