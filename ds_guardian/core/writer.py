@@ -28,13 +28,15 @@ class WriteResult:
 class FileWriter:
     """Handles writing refactored CSS files with backup support"""
     
-    def __init__(self, backup_dir: str = '.ds_guardian_backup'):
+    def __init__(self, target_dir: Path = None, backup_dir: str = '.ds_guardian_backup'):
         """
         Initialize file writer
         
         Args:
-            backup_dir: Directory for backups (relative to project root)
+            target_dir: Root of the project being refactored (backups live here)
+            backup_dir: Backup subdirectory name (relative to target_dir)
         """
+        self.target_dir = Path(target_dir) if target_dir else Path.cwd()
         self.backup_dir = backup_dir
         self._session_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
@@ -105,10 +107,10 @@ class FileWriter:
         """
         try:
             # Create backup directory structure
-            backup_root = Path.cwd() / self.backup_dir
+            backup_root = self.target_dir / self.backup_dir
             
             # Preserve directory structure in backup (all files share one session timestamp)
-            relative_path = file_path.relative_to(Path.cwd())
+            relative_path = file_path.relative_to(self.target_dir)
             backup_path = backup_root / self._session_timestamp / relative_path
             
             # Create parent directories
@@ -155,7 +157,7 @@ class FileWriter:
         Returns:
             List of backup session directories
         """
-        backup_root = Path.cwd() / self.backup_dir
+        backup_root = self.target_dir / self.backup_dir
         
         if not backup_root.exists():
             return []
@@ -178,7 +180,7 @@ class FileWriter:
         Returns:
             Total size in bytes
         """
-        backup_root = Path.cwd() / self.backup_dir
+        backup_root = self.target_dir / self.backup_dir
         
         if not backup_root.exists():
             return 0

@@ -20,6 +20,9 @@ Examples:
   dsg start /path/to/project   # Refactor specific directory
   dsg --check-setup            # Verify installation
   dsg start --dry-run          # Preview changes without applying
+  dsg extract                  # Extract design tokens from current directory
+  dsg extract /path/to/project # Extract design tokens from specific directory
+  dsg start --rules design_system.css  # Use a specific design system file
         """
     )
 
@@ -27,7 +30,7 @@ Examples:
     parser.add_argument(
         'command',
         nargs='?',
-        choices=['start', 'check-setup', 'review'],
+        choices=['start', 'check-setup', 'review', 'extract'],
         help='Command to run'
     )
 
@@ -73,8 +76,8 @@ Examples:
     parser.add_argument(
         '--rules',
         type=str,
-        default='rules.md',
-        help='Path to rules file (default: rules.md)'
+        default='design_system.css',
+        help='Path to design system file (default: design_system.css)'
     )
 
     parser.add_argument(
@@ -89,6 +92,13 @@ Examples:
         type=str,
         default='qwen2.5-coder:0.5b',
         help='Ollama model to use (default: qwen2.5-coder:0.5b)'
+    )
+
+    parser.add_argument(
+        '--output',
+        type=str,
+        default=None,
+        help='Output directory for extracted token files (default: target directory)'
     )
 
     args = parser.parse_args()
@@ -115,6 +125,18 @@ Examples:
             ascii_only=ascii_only
         )
         success = workflow.resume()
+        sys.exit(0 if success else 1)
+
+    # Handle extract command
+    if args.command == 'extract':
+        from ds_guardian.extract_workflow import ExtractWorkflow
+        target = args.output if args.output else args.target
+        workflow = ExtractWorkflow(
+            target_dir=target,
+            model=args.model,
+            ascii_only=ascii_only,
+        )
+        success = workflow.run()
         sys.exit(0 if success else 1)
 
     # Handle start command

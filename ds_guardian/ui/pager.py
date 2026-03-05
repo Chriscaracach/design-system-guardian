@@ -28,7 +28,7 @@ class InteractivePager:
         
         Args:
             console: Rich console instance
-            rules_file: Path to rules.md file to display in third column
+            rules_file: Path to design_system.css file to display in third column
         """
         self.console = console
         self.scroll_offset = 0
@@ -145,7 +145,7 @@ class InteractivePager:
                 layout["content"]["rules"].update(
                     Panel(
                         rules_text,
-                        title="[bold white]Rules (rules.md)[/bold white]" if self.active_panel == 'rules' else "[dim]Rules (rules.md)[/dim]",
+                        title="[bold white]Design System[/bold white]" if self.active_panel == 'rules' else "[dim]Design System[/dim]",
                         border_style=rules_border,
                         box=box.ROUNDED
                     )

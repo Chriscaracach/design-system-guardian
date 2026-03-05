@@ -32,7 +32,7 @@ class RefactoringWorkflow:
         
         Args:
             target_dir: Directory to scan
-            rules_file: Path to rules.md
+            rules_file: Path to design_system.css
             dry_run: Preview only, don't write files
             auto_apply: Apply all changes without review
             max_workers: Number of parallel workers for AI processing (default: 3)
@@ -40,7 +40,12 @@ class RefactoringWorkflow:
             ascii_only: Disable image/GIF rendering, use ASCII art only
         """
         self.target_dir = Path(target_dir)
-        self.rules_file = rules_file
+        # Resolve rules_file relative to target_dir when it is a bare filename
+        rules_path = Path(rules_file)
+        if not rules_path.is_absolute() and rules_path.parent == Path('.'):
+            self.rules_file = str(self.target_dir / rules_path.name)
+        else:
+            self.rules_file = str(rules_path)
         self.dry_run = dry_run
         self.auto_apply = auto_apply
         self.max_workers = max_workers
@@ -50,8 +55,8 @@ class RefactoringWorkflow:
         self.console = Console()
         self.scanner = FileScanner(target_dir)
         self.diff_generator = DiffGenerator()
-        self.writer = FileWriter()
-        self.session = RefactoringSession()
+        self.writer = FileWriter(target_dir=self.target_dir)
+        self.session = RefactoringSession(target_dir=self.target_dir)
         self.optimizer = PromptOptimizer()
         
         self.files = []
@@ -70,7 +75,7 @@ class RefactoringWorkflow:
                     return self.resume()
                 else:
                     self.session.clear()
-                    self.session = RefactoringSession()
+                    self.session = RefactoringSession(target_dir=self.target_dir)
 
             # Show splash screen while processing in background
             splash = SplashScreen(self.console, ascii_only=self.ascii_only)
@@ -169,14 +174,14 @@ class RefactoringWorkflow:
             parser = RulesParser(self.rules_file)
             self.rules = parser.parse()
         except FileNotFoundError:
-            self._bg_error = f"Rules file not found: '{self.rules_file}' — pass --rules <path> to specify a different file."
+            self._bg_error = f"Design system file not found: '{self.rules_file}' — create design_system.css with 'dsg extract', or pass --rules <path>."
             return False
         except Exception as e:
             self._bg_error = f"Failed to load rules: {e}"
             return False
         
         if self.rules.get_token_count() == 0:
-            self._bg_error = f"No design tokens found in '{self.rules_file}'. Check the file format."
+            self._bg_error = f"No design tokens found in '{self.rules_file}'. Check that it has /* Category */ sections with --token: value; declarations."
             return False
         
         return True
@@ -263,7 +268,7 @@ class RefactoringWorkflow:
     def resume(self):
         """Resume a previously saved session, skipping AI processing"""
         try:
-            self.session = RefactoringSession.load()
+            self.session = RefactoringSession.load(target_dir=self.target_dir)
         except FileNotFoundError:
             self.console.print("[red]✗ No saved session found. Run 'dsg start' to begin.[/red]")
             return False

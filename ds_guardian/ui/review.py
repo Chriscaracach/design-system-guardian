@@ -24,14 +24,14 @@ from ds_guardian.ui.pager import InteractivePager
 class InteractiveReviewer:
     """Manages interactive review with side-by-side diff view"""
     
-    def __init__(self, changes: List[FileChange], diff_generator: DiffGenerator, rules_file: str = 'rules.md'):
+    def __init__(self, changes: List[FileChange], diff_generator: DiffGenerator, rules_file: str = 'design_system.css'):
         """
         Initialize interactive reviewer
         
         Args:
             changes: List of file changes to review
             diff_generator: Diff generator instance
-            rules_file: Path to rules.md file to display
+            rules_file: Path to design_system.css file to display
         """
         self.changes = changes
         self.diff_generator = diff_generator

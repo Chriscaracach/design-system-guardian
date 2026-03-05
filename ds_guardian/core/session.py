@@ -35,14 +35,16 @@ class FileChange:
 class RefactoringSession:
     """Manages a refactoring session with multiple files"""
     
-    def __init__(self, session_file: str = '.ds_guardian_session.json'):
+    def __init__(self, target_dir: Path = None, session_file: str = '.ds_guardian_session.json'):
         """
         Initialize session
         
         Args:
-            session_file: Path to session file
+            target_dir: Root of the project being refactored (session file lives here)
+            session_file: Session filename (resolved inside target_dir)
         """
-        self.session_file = Path(session_file)
+        root = Path(target_dir) if target_dir else Path.cwd()
+        self.session_file = root / session_file
         self.changes: List[FileChange] = []
         self.metadata = {
             'created_at': datetime.now().isoformat(),
@@ -69,9 +71,9 @@ class RefactoringSession:
             json.dump(data, f, indent=2)
     
     @classmethod
-    def load(cls, session_file: str = '.ds_guardian_session.json'):
+    def load(cls, target_dir: Path = None, session_file: str = '.ds_guardian_session.json'):
         """Load session from file"""
-        session = cls(session_file)
+        session = cls(target_dir=target_dir, session_file=session_file)
         
         if not session.session_file.exists():
             raise FileNotFoundError(f"Session file not found: {session_file}")
