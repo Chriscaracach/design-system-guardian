@@ -37,10 +37,10 @@ source venv/bin/activate
 pip install -e .
 
 # Verify setup (uses Ollama by default)
-dsg --check-setup
+dsg check-setup
 
 # Configure a different AI provider (interactive wizard)
-dsg --model-configure
+dsg configure
 ```
 
 This installs the `dsg` command globally via `~/.local/bin`. If that directory
@@ -71,7 +71,7 @@ dsg start --auto-apply
 dsg start --rules /path/to/my-tokens.md
 
 # Verify your environment
-dsg --check-setup
+dsg check-setup
 ```
 
 ### Configuring the AI provider
@@ -79,7 +79,7 @@ dsg --check-setup
 Run the interactive wizard once to choose your provider, model, and API key:
 
 ```bash
-dsg --model-configure
+dsg configure
 ```
 
 The wizard walks you through:
@@ -91,7 +91,7 @@ The wizard walks you through:
 Configuration is saved globally and used by all subsequent `dsg` commands. After configuring, verify the setup:
 
 ```bash
-dsg --check-setup
+dsg check-setup
 ```
 
 | Provider    | Default model             | SDK to install                         | Env var (alternative to stored key) |

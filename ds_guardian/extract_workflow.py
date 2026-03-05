@@ -22,11 +22,9 @@ class ExtractWorkflow:
         self,
         target_dir: str,
         model: str = "qwen2.5-coder:0.5b",
-        ascii_only: bool = False,
     ):
         self.target_dir = Path(target_dir).resolve()
         self.model = model
-        self.ascii_only = ascii_only
 
         self.console = Console()
         self.scanner = FileScanner(target_dir)
@@ -42,7 +40,7 @@ class ExtractWorkflow:
     def run(self) -> bool:
         """Run the extraction workflow"""
         try:
-            splash = SplashScreen(self.console, ascii_only=self.ascii_only)
+            splash = SplashScreen(self.console)
 
             def background_processing():
                 try:

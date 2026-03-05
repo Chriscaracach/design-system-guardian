@@ -25,6 +25,16 @@ class FileScanner:
     """Scans directories for style files"""
     
     STYLE_EXTENSIONS = {'.css', '.scss', '.sass', '.less'}
+
+    DS_GUARDIAN_FILES = {
+        'design_system.css',
+        'palette.css',
+        'fonts.css',
+        'spacing.css',
+        'borders.css',
+        'shadows.css',
+        'motion.css',
+    }
     
     def __init__(self, root_dir: str = '.'):
         """
@@ -83,6 +93,9 @@ class FileScanner:
                 
                 # Check if it's a style file
                 if file_path.suffix.lower() in self.STYLE_EXTENSIONS:
+                    # Skip DS Guardian output files
+                    if filename in self.DS_GUARDIAN_FILES:
+                        continue
                     # Skip if in excluded directory
                     if not self._is_in_excluded_dir(file_path, exclude_patterns):
                         try:

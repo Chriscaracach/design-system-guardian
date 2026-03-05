@@ -5,7 +5,6 @@ Registered as the 'dsg' console script via pyproject.toml.
 
 import sys
 import argparse
-from pathlib import Path
 
 
 def main():
@@ -15,20 +14,20 @@ def main():
         description="DS Guardian — AI-powered CSS design token refactoring tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  dsg start                              # Refactor current directory
-  dsg start /path/to/project             # Refactor specific directory
-  dsg info                               # Pre-flight summary for current directory
-  dsg info /path/to/project              # Pre-flight summary for a specific directory
-  dsg --check-setup                      # Verify installation
-  dsg start --dry-run                    # Preview changes without applying
-  dsg extract                            # Extract design tokens from current directory
-  dsg extract /path/to/project           # Extract design tokens from specific directory
-  dsg start --rules design_system.css    # Use a specific design system file
+Commands:
+  start [target]       Refactor CSS files in target directory (default: current dir)
+  info [target]        Pre-flight summary: provider, rules, file count, session state
+  extract [target]     Extract design tokens from CSS files
+  review               Resume a saved refactoring session
+  configure            Interactive wizard to set AI provider, model & API key
+  check-setup          Verify the configured provider is ready
 
-AI model:
-  dsg --model-configure                  # Interactive wizard to set provider, model & API key
-  dsg --check-setup                      # Verify the configured provider is ready
+Options (for 'start' and 'review'):
+  --dry-run            Preview changes without writing files
+  --auto-apply         Apply all changes without manual review
+  --rules <file>       Path to design system file (default: design_system.css)
+  --workers <n>        Parallel AI workers (default: 3)
+  --output <dir>       Output directory for extracted tokens (extract only)
 
 Install cloud provider SDKs:
   pip install "ds-guardian[anthropic]"
@@ -38,27 +37,18 @@ Install cloud provider SDKs:
         """
     )
 
-    # Main command
     parser.add_argument(
         'command',
         nargs='?',
-        choices=['start', 'check-setup', 'review', 'extract', 'info'],
+        choices=['start', 'info', 'extract', 'review', 'configure', 'check-setup'],
         help='Command to run'
     )
 
-    # Positional argument for target directory
     parser.add_argument(
         'target',
         nargs='?',
         default='.',
         help='Target directory to scan (default: current directory)'
-    )
-
-    # Flags
-    parser.add_argument(
-        '--check-setup',
-        action='store_true',
-        help='Verify installation and setup'
     )
 
     parser.add_argument(
@@ -71,18 +61,6 @@ Install cloud provider SDKs:
         '--auto-apply',
         action='store_true',
         help='Apply all changes without review'
-    )
-
-    parser.add_argument(
-        '--no-gifs',
-        action='store_true',
-        help='Disable GIF animations (use ASCII only)'
-    )
-
-    parser.add_argument(
-        '--ascii-only',
-        action='store_true',
-        help='Use only ASCII characters (no Unicode)'
     )
 
     parser.add_argument(
@@ -100,12 +78,6 @@ Install cloud provider SDKs:
     )
 
     parser.add_argument(
-        '--model-configure',
-        action='store_true',
-        help='Run the interactive AI model configuration wizard'
-    )
-
-    parser.add_argument(
         '--output',
         type=str,
         default=None,
@@ -114,8 +86,8 @@ Install cloud provider SDKs:
 
     args = parser.parse_args()
 
-    # Handle model-configure command
-    if args.model_configure:
+    # Handle configure command
+    if args.command == 'configure':
         from ds_guardian.configure import ModelConfigurator
         ModelConfigurator().run()
         return
@@ -125,13 +97,11 @@ Install cloud provider SDKs:
     model_config = ModelConfig.load()
 
     # Handle check-setup command
-    if args.check_setup or args.command == 'check-setup':
+    if args.command == 'check-setup':
         from ds_guardian.checker import SetupChecker
         checker = SetupChecker(model_config=model_config)
         checker.check_all()
         return
-
-    ascii_only = args.no_gifs or args.ascii_only
 
     # Handle info command
     if args.command == 'info':
@@ -149,7 +119,6 @@ Install cloud provider SDKs:
             auto_apply=args.auto_apply,
             max_workers=args.workers,
             model_config=model_config,
-            ascii_only=ascii_only
         )
         success = workflow.resume()
         sys.exit(0 if success else 1)
@@ -160,8 +129,6 @@ Install cloud provider SDKs:
         target = args.output if args.output else args.target
         workflow = ExtractWorkflow(
             target_dir=target,
-            model_config=model_config,
-            ascii_only=ascii_only,
         )
         success = workflow.run()
         sys.exit(0 if success else 1)
@@ -169,7 +136,6 @@ Install cloud provider SDKs:
     # Handle start command
     if args.command == 'start':
         from ds_guardian.workflow import RefactoringWorkflow
-
         workflow = RefactoringWorkflow(
             target_dir=args.target,
             rules_file=args.rules,
@@ -177,9 +143,7 @@ Install cloud provider SDKs:
             auto_apply=args.auto_apply,
             max_workers=args.workers,
             model_config=model_config,
-            ascii_only=ascii_only
         )
-
         success = workflow.run()
         sys.exit(0 if success else 1)
 

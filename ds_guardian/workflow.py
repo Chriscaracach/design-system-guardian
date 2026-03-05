@@ -30,7 +30,7 @@ from ds_guardian.ui.splash import SplashScreen
 class RefactoringWorkflow:
     """Manages a complete refactoring workflow"""
     
-    def __init__(self, target_dir: str, rules_file: str, dry_run: bool = False, auto_apply: bool = False, max_workers: int = 3, model_config: ModelConfig = None, ascii_only: bool = False):
+    def __init__(self, target_dir: str, rules_file: str, dry_run: bool = False, auto_apply: bool = False, max_workers: int = 3, model_config: ModelConfig = None):
         """
         Initialize refactoring workflow
         
@@ -41,7 +41,6 @@ class RefactoringWorkflow:
             auto_apply: Apply all changes without review
             max_workers: Number of parallel workers for AI processing (default: 3)
             model_config: Persisted AI provider configuration (loads from disk if None)
-            ascii_only: Disable image/GIF rendering, use ASCII art only
         """
         self.target_dir = Path(target_dir)
         # Resolve rules_file relative to target_dir when it is a bare filename
@@ -54,7 +53,6 @@ class RefactoringWorkflow:
         self.auto_apply = auto_apply
         self.max_workers = max_workers
         self.model_config = model_config or ModelConfig.load()
-        self.ascii_only = ascii_only
         
         self.console = Console()
         self.scanner = FileScanner(target_dir)
@@ -82,7 +80,7 @@ class RefactoringWorkflow:
                     self.session = RefactoringSession(target_dir=self.target_dir)
 
             # Show splash screen while processing in background
-            splash = SplashScreen(self.console, ascii_only=self.ascii_only)
+            splash = SplashScreen(self.console)
             
             def background_processing():
                 """Run initialization and processing in background"""
