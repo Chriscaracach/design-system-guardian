@@ -1,15 +1,35 @@
+<p align="center">
+  <img src="assets/splash.png" alt="DS Guardian" width="480" />
+</p>
+
 # DS Guardian
 
-**DS Guardian** is an AI-powered CLI tool that automatically refactors CSS files to use design system tokens (CSS variables). Point it at your project, provide your design token rules, and it will replace hardcoded values with the right CSS variables — letting you review every change before it's applied.
+**DS Guardian** is an AI-powered CLI tool for keeping your CSS in sync with your design system.
+
+It does two things:
+
+- **Refactor** — point it at a project with an existing `design-system.css` and it will replace hardcoded values with the correct CSS variables, letting you review every change before it's applied.
+- **Extract** — point it at a codebase with no design system yet and it will analyze your CSS, identify recurring values, and generate a `design-system.css` for you.
+
+Runs locally with [Ollama](https://ollama.com) (free, no API key) or with any cloud provider — Anthropic, OpenAI, or Google Gemini. Bring your own model.
 
 ---
 
 ## How it works
 
+**Refactor mode** (`dsg start`)
+
 1. **Scan** — finds all `.css`, `.scss`, `.sass`, and `.less` files in your target directory
-2. **Process** — sends each file to an AI model (local or cloud) along with your design token rules
-3. **Review** — presents a side-by-side diff for each changed file; you accept, reject, or skip each one
-4. **Apply** — writes the accepted changes and creates backups of originals
+2. **Process** — sends each file to the AI along with your `design-system.css` tokens
+3. **Review** — presents a side-by-side diff for each changed file; accept, reject, or skip
+4. **Apply** — writes accepted changes and creates timestamped backups of the originals
+
+**Extract mode** (`dsg extract`)
+
+1. **Scan** — finds all style files in your project
+2. **Analyze** — the AI identifies hardcoded values and groups them into token categories
+3. **Review** — you inspect the proposed tokens before anything is written
+4. **Generate** — writes a ready-to-use `design-system.css` file
 
 ---
 
@@ -24,27 +44,61 @@
 
 ---
 
+## AI providers
+
+|             | Local (Ollama)                                                     | Cloud (Anthropic / OpenAI / Gemini) |
+| ----------- | ------------------------------------------------------------------ | ----------------------------------- |
+| **Cost**    | Free                                                               | Pay-per-use                         |
+| **Privacy** | Runs on your machine, nothing leaves                               | Code is sent to the provider's API  |
+| **Quality** | Good with larger models, varies with smaller ones                  | Consistently strong results         |
+| **Setup**   | Requires [Ollama](https://ollama.com) installed and a model pulled | Requires an API key                 |
+| **Speed**   | Depends on your hardware                                           | Fast                                |
+
+**Recommendation:** Start with Ollama if you want a free, private setup. Switch to a cloud provider if you need more reliable refactoring results or are working with a large codebase.
+
+Run `dsg configure` to switch providers at any time.
+
+---
+
 ## Installation
 
-```bash
-# Clone the repo
-git clone <repo-url>
-cd ds-guardian
+The recommended way to install DS Guardian is with [pipx](https://pipx.pypa.io), which installs the `dsg` command globally and manages the Python environment for you — no venv setup required.
 
-# Create a virtual environment and install
-python -m venv venv
-source venv/bin/activate
-pip install -e .
+```bash
+# Install pipx if you don't have it
+pip install pipx
+pipx ensurepath
+
+# Install DS Guardian
+pipx install git+<repo-url>
 
 # Verify setup (uses Ollama by default)
 dsg check-setup
 
-# Configure a different AI provider (interactive wizard)
+# Configure your AI provider (interactive wizard)
 dsg configure
 ```
 
-This installs the `dsg` command globally via `~/.local/bin`. If that directory
-isn't on your PATH yet, add it to your shell config (fish: `fish_add_path ~/.local/bin`).
+> **Using a cloud provider?** Install its SDK alongside DS Guardian:
+>
+> ```bash
+> pipx install "git+<repo-url>[anthropic]"   # Claude
+> pipx install "git+<repo-url>[openai]"       # GPT
+> pipx install "git+<repo-url>[gemini]"       # Gemini
+> ```
+
+<details>
+<summary>Manual install (pip + venv)</summary>
+
+```bash
+git clone <repo-url>
+cd ds-guardian
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e .
+```
+
+</details>
 
 ---
 
@@ -67,8 +121,8 @@ dsg start --dry-run
 # Apply all changes without manual review
 dsg start --auto-apply
 
-# Use a custom rules file
-dsg start --rules /path/to/my-tokens.md
+# Use a custom design system file
+dsg start --rules /path/to/design-system.css
 
 # Verify your environment
 dsg check-setup
@@ -103,54 +157,52 @@ dsg check-setup
 
 ---
 
-## Rules file (`rules.md`)
+## Design system file (`design-system.css`)
 
-DS Guardian reads design tokens from a Markdown file. By default it looks for `rules.md` in the current directory.
+DS Guardian reads your design tokens from a CSS file. By default it looks for `design-system.css` in the current directory.
 
-Format your tokens under section headers that describe their category:
+Define your tokens as CSS custom properties inside a `:root` block:
 
-```markdown
-## Colors
+```css
+:root {
+  /* Colors */
+  --primary: #2563eb;
+  --gray-900: #111827;
+  --white: #ffffff;
 
---primary: #2563eb
---gray-900: #111827
---white: #ffffff
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-4: 16px;
 
-## Spacing
+  /* Typography */
+  --text-sm: 0.875rem;
+  --font-bold: 700;
 
---space-1: 4px
---space-2: 8px
---space-4: 16px
-
-## Typography
-
---text-sm: 0.875rem
---font-bold: 700
-
-## Borders
-
---radius-md: 6px
---radius-full: 9999px
+  /* Borders */
+  --radius-md: 6px;
+  --radius-full: 9999px;
+}
 ```
 
-DS Guardian auto-detects the category from the header name and filters tokens to only the ones relevant to each file, keeping AI prompts lean.
+DS Guardian parses the token names and values, filters to only the ones relevant to each file, and keeps AI prompts lean.
 
 ---
 
 ## Interactive review
 
-During review, for each changed file you see a **side-by-side diff** (original left, refactored right) alongside the rules file for reference.
+During review, for each changed file you see a **side-by-side diff** (original left, refactored right) alongside your design system file for reference.
 
-| Key       | Action                               |
-| --------- | ------------------------------------ |
-| `1`       | Accept this change                   |
-| `2`       | Reject this change                   |
-| `3`       | Skip (decide later)                  |
-| `4`       | Accept all remaining                 |
-| `5` / `q` | Save and quit                        |
-| `↑` / `k` | Scroll up                            |
-| `↓` / `j` | Scroll down                          |
-| `Tab`     | Switch between diff and rules panels |
+| Key       | Action                                       |
+| --------- | -------------------------------------------- |
+| `1`       | Accept this change                           |
+| `2`       | Reject this change                           |
+| `3`       | Skip (decide later)                          |
+| `4`       | Accept all remaining                         |
+| `5` / `q` | Save and quit                                |
+| `↑` / `k` | Scroll up                                    |
+| `↓` / `j` | Scroll down                                  |
+| `Tab`     | Switch between diff and design system panels |
 
 ---
 
@@ -164,31 +216,37 @@ Every accepted change creates a timestamped backup under `.ds_guardian_backup/` 
 
 ```
 ds-guardian/
-├── main.py              # CLI entry point (legacy, prefer dsg)
-├── rules.md             # Your design token definitions
 ├── requirements.txt
 └── ds_guardian/
-    ├── checker.py       # Setup verification
-    ├── workflow.py      # Main orchestration
+    ├── cli.py               # Entry point — dsg command
+    ├── checker.py           # Setup verification
+    ├── configure.py         # Interactive provider wizard
+    ├── info.py              # Pre-flight summary
+    ├── workflow.py          # Refactoring orchestration
+    ├── extract_workflow.py  # Token extraction orchestration
     ├── core/
-    │   ├── scanner.py   # File discovery
-    │   ├── rules.py     # Token parser
-    │   ├── session.py   # Session state
-    │   └── writer.py    # File writing & backups
+    │   ├── scanner.py       # File discovery
+    │   ├── rules.py         # Token parser
+    │   ├── extractor.py     # Token extraction logic
+    │   ├── session.py       # Session state
+    │   └── writer.py        # File writing & backups
     ├── ai/
-    │   ├── client.py        # BaseAIClient + OllamaClient
-    │   ├── anthropic_client.py # Anthropic Claude client
-    │   ├── openai_client.py    # OpenAI GPT client
-    │   ├── gemini_client.py    # Google Gemini client
-    │   ├── refactorer.py    # CSS refactoring logic
-    │   └── optimizer.py     # Token relevance filtering
+    │   ├── client.py            # BaseAIClient + OllamaClient
+    │   ├── config.py            # ModelConfig (provider settings)
+    │   ├── anthropic_client.py  # Anthropic Claude client
+    │   ├── openai_client.py     # OpenAI GPT client
+    │   ├── gemini_client.py     # Google Gemini client
+    │   ├── refactorer.py        # CSS refactoring logic
+    │   ├── extraction_refactorer.py # Token extraction AI logic
+    │   └── optimizer.py         # Token relevance filtering
     └── ui/
-        ├── components.py# TUI building blocks
-        ├── diff.py      # Diff generation
-        ├── side_by_side.py # Side-by-side view
-        ├── pager.py     # Keyboard navigation
-        ├── splash.py    # Splash screen
-        └── review.py    # Interactive review loop
+        ├── components.py        # TUI building blocks
+        ├── diff.py              # Diff generation
+        ├── side_by_side.py      # Side-by-side diff view
+        ├── pager.py             # Keyboard navigation
+        ├── splash.py            # Splash screen
+        ├── review.py            # Interactive review loop
+        └── extraction_review.py # Extraction review loop
 ```
 
 ---
