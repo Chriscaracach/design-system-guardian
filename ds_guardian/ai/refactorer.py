@@ -4,7 +4,7 @@ Handles CSS refactoring using AI
 """
 
 import re
-from ds_guardian.ai.client import OllamaClient, RefactoringResult
+from ds_guardian.ai.client import BaseAIClient, RefactoringResult
 
 
 class CSSRefactorer:
@@ -28,7 +28,7 @@ Output format:
 - No explanations or comments
 - Just the raw CSS code"""
     
-    def __init__(self, client: OllamaClient):
+    def __init__(self, client: BaseAIClient):
         """
         Initialize refactorer
         

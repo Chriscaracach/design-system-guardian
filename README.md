@@ -7,7 +7,7 @@
 ## How it works
 
 1. **Scan** — finds all `.css`, `.scss`, `.sass`, and `.less` files in your target directory
-2. **Process** — sends each file to a local AI model (via [Ollama](https://ollama.com)) along with your design token rules
+2. **Process** — sends each file to an AI model (local or cloud) along with your design token rules
 3. **Review** — presents a side-by-side diff for each changed file; you accept, reject, or skip each one
 4. **Apply** — writes the accepted changes and creates backups of originals
 
@@ -16,8 +16,11 @@
 ## Requirements
 
 - Python 3.10+
-- [Ollama](https://ollama.com) running locally
-- A compatible model pulled (e.g. `qwen2.5-coder:0.5b`)
+- **One of the following AI backends:**
+  - [Ollama](https://ollama.com) running locally (default, free, no API key)
+  - Anthropic API key → Claude
+  - OpenAI API key → GPT
+  - Google AI API key → Gemini
 
 ---
 
@@ -33,8 +36,11 @@ python -m venv venv
 source venv/bin/activate
 pip install -e .
 
-# Verify setup
+# Verify setup (uses Ollama by default)
 dsg --check-setup
+
+# Configure a different AI provider (interactive wizard)
+dsg --model-configure
 ```
 
 This installs the `dsg` command globally via `~/.local/bin`. If that directory
@@ -45,7 +51,11 @@ isn't on your PATH yet, add it to your shell config (fish: `fish_add_path ~/.loc
 ## Usage
 
 ```bash
-# Refactor the current directory
+# Pre-flight summary: see what dsg start will do before running it
+dsg info
+dsg info /path/to/your/project
+
+# Refactor the current directory (uses Ollama by default)
 dsg start
 
 # Refactor a specific project
@@ -57,15 +67,39 @@ dsg start --dry-run
 # Apply all changes without manual review
 dsg start --auto-apply
 
-# Use a different AI model
-dsg start --model qwen2.5-coder:1.5b
-
 # Use a custom rules file
 dsg start --rules /path/to/my-tokens.md
 
 # Verify your environment
 dsg --check-setup
 ```
+
+### Configuring the AI provider
+
+Run the interactive wizard once to choose your provider, model, and API key:
+
+```bash
+dsg --model-configure
+```
+
+The wizard walks you through:
+
+1. **Provider** — `ollama`, `anthropic`, `openai`, or `gemini`
+2. **Model** — with suggestions per provider
+3. **API key** — stored in `~/.config/ds_guardian/model.json` (cloud providers only)
+
+Configuration is saved globally and used by all subsequent `dsg` commands. After configuring, verify the setup:
+
+```bash
+dsg --check-setup
+```
+
+| Provider    | Default model             | SDK to install                         | Env var (alternative to stored key) |
+| ----------- | ------------------------- | -------------------------------------- | ----------------------------------- |
+| `ollama`    | `qwen2.5-coder:0.5b`      | — (local)                              | —                                   |
+| `anthropic` | `claude-3-5-haiku-latest` | `pip install "ds-guardian[anthropic]"` | `ANTHROPIC_API_KEY`                 |
+| `openai`    | `gpt-4o-mini`             | `pip install "ds-guardian[openai]"`    | `OPENAI_API_KEY`                    |
+| `gemini`    | `gemini-1.5-flash`        | `pip install "ds-guardian[gemini]"`    | `GEMINI_API_KEY`                    |
 
 ---
 
@@ -142,9 +176,12 @@ ds-guardian/
     │   ├── session.py   # Session state
     │   └── writer.py    # File writing & backups
     ├── ai/
-    │   ├── client.py    # Ollama API client
-    │   ├── refactorer.py# CSS refactoring logic
-    │   └── optimizer.py # Token relevance filtering
+    │   ├── client.py        # BaseAIClient + OllamaClient
+    │   ├── anthropic_client.py # Anthropic Claude client
+    │   ├── openai_client.py    # OpenAI GPT client
+    │   ├── gemini_client.py    # Google Gemini client
+    │   ├── refactorer.py    # CSS refactoring logic
+    │   └── optimizer.py     # Token relevance filtering
     └── ui/
         ├── components.py# TUI building blocks
         ├── diff.py      # Diff generation

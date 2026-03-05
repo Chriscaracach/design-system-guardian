@@ -11,13 +11,22 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
+from ds_guardian.ai.config import (
+    ModelConfig,
+    PROVIDER_ENV_VARS,
+    PROVIDER_PACKAGES,
+    PROVIDER_INSTALL,
+)
+
 
 class SetupChecker:
     """Verifies that the environment is properly set up"""
-    
-    def __init__(self, model: str = 'qwen2.5-coder:0.5b'):
+
+    def __init__(self, model_config: ModelConfig = None):
         self.console = Console()
-        self.model = model
+        self.model_config = model_config or ModelConfig.load()
+        self.provider = self.model_config.provider
+        self.model = self.model_config.model
         self.issues = []
         self.warnings = []
     
@@ -34,8 +43,11 @@ class SetupChecker:
         self.check_dependencies()
         
         self.console.print("\n[bold]AI Backend:[/bold]")
-        self.check_ollama()
-        self.check_model(self.model)
+        if self.provider == 'ollama':
+            self.check_ollama()
+            self.check_model(self.model)
+        else:
+            self.check_cloud_provider(self.provider)
         
         self.console.print("\n[bold]Terminal Capabilities:[/bold]")
         self.check_terminal()
@@ -65,9 +77,11 @@ class SetupChecker:
     def check_dependencies(self):
         """Check if all dependencies are installed"""
         from importlib.metadata import version, PackageNotFoundError
-        
+
         deps = ["rich", "requests"]
-        
+        if self.provider != 'ollama':
+            deps.append(PROVIDER_PACKAGES[self.provider])
+
         for dep in deps:
             try:
                 ver = version(dep)
@@ -151,6 +165,32 @@ class SetupChecker:
         except Exception:
             self.warning("Could not check models (Ollama not running)")
     
+    def check_cloud_provider(self, provider: str):
+        """Check cloud provider SDK and API key"""
+        package = PROVIDER_PACKAGES[provider]
+        env_var = PROVIDER_ENV_VARS[provider]
+        install_cmd = PROVIDER_INSTALL[provider]
+
+        # Check SDK installed
+        try:
+            from importlib.metadata import version, PackageNotFoundError
+            ver = version(package)
+            self.success(f"{package} {ver} installed")
+        except Exception:
+            self.error(f"{package} not installed")
+            self.issues.append(f"Install {package}")
+
+        # Check API key (flag takes priority over env var)
+        key = self.model_config.resolved_api_key()
+        if key:
+            masked = key[:6] + "*" * (len(key) - 6) if len(key) > 6 else "***"
+            self.success(f"API key found ({env_var}: {masked}...)")
+        else:
+            self.error(f"API key not set ({env_var} env var is empty)")
+            self.issues.append(f"Set {env_var}")
+
+        self.success(f"Provider: {provider} — model: {self.model}")
+
     def check_terminal(self):
         """Check terminal capabilities"""
         # Unicode
@@ -237,8 +277,28 @@ class SetupChecker:
     def generate_fix_commands(self):
         """Generate copy-pastable fix commands"""
         commands = []
-        
-        # Check for missing dependencies
+
+        # Cloud provider SDK missing
+        if self.provider != 'ollama':
+            package = PROVIDER_PACKAGES[self.provider]
+            env_var = PROVIDER_ENV_VARS[self.provider]
+            install_cmd = PROVIDER_INSTALL[self.provider]
+
+            if any(f"Install {package}" in issue for issue in self.issues):
+                commands.append({
+                    'comment': f"# Install {self.provider} SDK",
+                    'command': install_cmd
+                })
+
+            if any(f"Set {env_var}" in issue for issue in self.issues):
+                commands.append({
+                    'comment': f"# Set your {self.provider.title()} API key",
+                    'command': f"export {env_var}=\"your-api-key-here\""
+                })
+
+            return commands
+
+        # Ollama path — original logic
         missing_deps = [issue for issue in self.issues if "Install" in issue and "Ollama" not in issue]
         if missing_deps:
             deps = " ".join([d.split()[-1] for d in missing_deps])

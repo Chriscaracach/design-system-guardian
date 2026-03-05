@@ -1,12 +1,30 @@
 """
 AI Client Module
-Handles communication with Ollama
+Handles communication with Ollama and cloud AI providers.
 """
 
 import json
 import requests
+from abc import ABC, abstractmethod
 from typing import Optional, Dict
 from dataclasses import dataclass
+
+
+class BaseAIClient(ABC):
+    """Abstract base class for all AI provider clients"""
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Return True if the provider is reachable and ready"""
+
+    @abstractmethod
+    def generate(self, prompt: str, system: Optional[str] = None) -> Dict:
+        """
+        Send a prompt and return a normalised response dict:
+            {"response": "<text>", "eval_count": <int>}
+        On error return:
+            {"error": "<message>"}
+        """
 
 
 @dataclass
@@ -23,7 +41,7 @@ class RefactoringResult:
         return f"Error: {self.error}"
 
 
-class OllamaClient:
+class OllamaClient(BaseAIClient):
     """Client for Ollama API"""
     
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5-coder:0.5b"):

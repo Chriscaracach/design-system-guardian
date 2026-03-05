@@ -16,6 +16,10 @@ from ds_guardian.core.rules import RulesParser
 from ds_guardian.core.session import RefactoringSession, FileChange
 from ds_guardian.core.writer import FileWriter
 from ds_guardian.ai.client import OllamaClient
+from ds_guardian.ai.anthropic_client import AnthropicClient
+from ds_guardian.ai.openai_client import OpenAIClient
+from ds_guardian.ai.gemini_client import GeminiClient
+from ds_guardian.ai.config import ModelConfig
 from ds_guardian.ai.refactorer import CSSRefactorer
 from ds_guardian.ai.optimizer import PromptOptimizer
 from ds_guardian.ui.diff import DiffGenerator
@@ -26,7 +30,7 @@ from ds_guardian.ui.splash import SplashScreen
 class RefactoringWorkflow:
     """Manages a complete refactoring workflow"""
     
-    def __init__(self, target_dir: str, rules_file: str, dry_run: bool = False, auto_apply: bool = False, max_workers: int = 3, model: str = 'qwen2.5-coder:0.5b', ascii_only: bool = False):
+    def __init__(self, target_dir: str, rules_file: str, dry_run: bool = False, auto_apply: bool = False, max_workers: int = 3, model_config: ModelConfig = None, ascii_only: bool = False):
         """
         Initialize refactoring workflow
         
@@ -36,7 +40,7 @@ class RefactoringWorkflow:
             dry_run: Preview only, don't write files
             auto_apply: Apply all changes without review
             max_workers: Number of parallel workers for AI processing (default: 3)
-            model: Ollama model to use
+            model_config: Persisted AI provider configuration (loads from disk if None)
             ascii_only: Disable image/GIF rendering, use ASCII art only
         """
         self.target_dir = Path(target_dir)
@@ -49,7 +53,7 @@ class RefactoringWorkflow:
         self.dry_run = dry_run
         self.auto_apply = auto_apply
         self.max_workers = max_workers
-        self.model = model
+        self.model_config = model_config or ModelConfig.load()
         self.ascii_only = ascii_only
         
         self.console = Console()
@@ -189,15 +193,38 @@ class RefactoringWorkflow:
     def _initialize_ai(self) -> bool:
         """Initialize AI client and refactorer (runs silently in background)"""
         try:
-            self.client = OllamaClient(model=self.model)
-            
+            cfg = self.model_config
+            api_key = cfg.resolved_api_key()
+
+            if cfg.provider == 'anthropic':
+                self.client = AnthropicClient(api_key=api_key, model=cfg.model)
+                unavailable_msg = (
+                    "Anthropic client unavailable. Check that the 'anthropic' package is installed "
+                    "(pip install anthropic) and that ANTHROPIC_API_KEY is set."
+                )
+            elif cfg.provider == 'openai':
+                self.client = OpenAIClient(api_key=api_key, model=cfg.model)
+                unavailable_msg = (
+                    "OpenAI client unavailable. Check that the 'openai' package is installed "
+                    "(pip install openai) and that OPENAI_API_KEY is set."
+                )
+            elif cfg.provider == 'gemini':
+                self.client = GeminiClient(api_key=api_key, model=cfg.model)
+                unavailable_msg = (
+                    "Gemini client unavailable. Check that the 'google-generativeai' package is installed "
+                    "(pip install google-generativeai) and that GEMINI_API_KEY is set."
+                )
+            else:
+                self.client = OllamaClient(model=cfg.model)
+                unavailable_msg = "Could not connect to Ollama. Is it running? Try: ollama serve"
+
             if not self.client.is_available():
-                self._bg_error = "Could not connect to Ollama. Is it running? Try: ollama serve"
+                self._bg_error = unavailable_msg
                 return False
-            
+
             self.refactorer = CSSRefactorer(self.client)
             return True
-            
+
         except Exception as e:
             self._bg_error = f"AI initialization error: {e}"
             return False
