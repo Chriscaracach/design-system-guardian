@@ -6,10 +6,11 @@
 
 **DS Guardian** is an AI-powered CLI tool for keeping your CSS in sync with your design system.
 
-It does two things:
+It has three main commands:
 
-- **Refactor** — point it at a project with an existing `design-system.css` and it will replace hardcoded values with the correct CSS variables, letting you review every change before it's applied.
-- **Extract** — point it at a codebase with no design system yet and it will analyze your CSS, identify recurring values, and generate a `design-system.css` for you.
+- **Analyze** — audit your design system health with metrics, AI analysis, and improvement proposals
+- **Refactor** — replace hardcoded CSS values with design system tokens, reviewing each change before it's applied
+- **Extract** — generate a `design-system.css` from existing CSS by identifying and grouping recurring values
 
 Runs locally with [Ollama](https://ollama.com) (free, no API key) or with any cloud provider — Anthropic, OpenAI, or Google Gemini. Bring your own model.
 
@@ -17,7 +18,14 @@ Runs locally with [Ollama](https://ollama.com) (free, no API key) or with any cl
 
 ## How it works
 
-**Refactor mode** (`dsg start`)
+**Analyze mode** (`dsg analyze`)
+
+1. **Scan** — finds all style files and your `design-system.css`
+2. **Compute metrics** — calculates token coverage %, orphaned values, unused tokens, and duplicates
+3. **AI analysis** — qualitative assessment of design system health and consistency
+4. **Generate proposals** — AI-suggested improvements and refactoring opportunities
+
+**Refactor mode** (`dsg refactor`)
 
 1. **Scan** — finds all `.css`, `.scss`, `.sass`, and `.less` files in your target directory
 2. **Process** — sends each file to the AI along with your `design-system.css` tokens
@@ -104,29 +112,98 @@ pip install -e .
 
 ## Usage
 
-```bash
-# Pre-flight summary: see what dsg start will do before running it
-dsg info
-dsg info /path/to/your/project
+### Core commands
 
+**`dsg refactor [target]`** — Refactor CSS files to use design system tokens
+
+```bash
 # Refactor the current directory (uses Ollama by default)
-dsg start
+dsg refactor
 
 # Refactor a specific project
-dsg start /path/to/your/project
+dsg refactor /path/to/your/project
 
 # Preview changes without writing files
-dsg start --dry-run
+dsg refactor --dry-run
 
 # Apply all changes without manual review
-dsg start --auto-apply
+dsg refactor --auto-apply
 
 # Use a custom design system file
-dsg start --rules /path/to/design-system.css
+dsg refactor --rules /path/to/design-system.css
 
-# Verify your environment
+# Use multiple parallel workers (default: 3)
+dsg refactor --workers 5
+```
+
+**`dsg extract [target]`** — Extract design tokens from existing CSS
+
+```bash
+# Extract tokens from current directory
+dsg extract
+
+# Extract from a specific project
+dsg extract /path/to/your/project
+
+# Specify output directory for generated design-system.css
+dsg extract --output /path/to/output
+```
+
+**`dsg analyze [target]`** — Design system health report
+
+```bash
+# Analyze design system usage in current directory
+dsg analyze
+
+# Analyze a specific project
+dsg analyze /path/to/your/project
+
+# Use a custom design system file
+dsg analyze --rules /path/to/design-system.css
+```
+
+Generates a comprehensive report including:
+
+- **Metrics** — token coverage %, orphaned values, unused tokens, duplicates
+- **AI Analysis** — qualitative assessment of design system health
+- **Proposals** — AI-suggested improvements and refactoring opportunities
+
+**`dsg review`** — Resume a saved refactoring session
+
+```bash
+# Resume the last refactoring session
+dsg review
+
+# Resume with dry-run mode
+dsg review --dry-run
+
+# Resume and auto-apply remaining changes
+dsg review --auto-apply
+```
+
+### Setup & configuration
+
+**`dsg configure`** — Interactive wizard to set AI provider, model & API key
+
+```bash
+dsg configure
+```
+
+**`dsg check-setup`** — Verify your environment is ready
+
+```bash
 dsg check-setup
 ```
+
+**`dsg info [target]`** — Pre-flight summary before running refactor
+
+```bash
+# See what dsg refactor will do before running it
+dsg info
+dsg info /path/to/your/project
+```
+
+Shows: AI provider, model, design system file, file count, and session state.
 
 ### Configuring the AI provider
 

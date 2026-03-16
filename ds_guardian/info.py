@@ -1,5 +1,5 @@
 """
-Info command — shows what will happen when 'dsg start' runs in a directory.
+Info command — shows what will happen when 'dsg refactor' runs in a directory.
 Invoked via: dsg info [target]
 """
 
@@ -34,7 +34,7 @@ class InfoCommand:
         self.console.print()
         self.console.print(Panel(
             f"[bold cyan]DS Guardian — Pre-flight Info[/bold cyan]\n"
-            f"[dim]What will happen when you run [bold]dsg start[/bold] here[/dim]",
+            f"[dim]What will happen when you run [bold]dsg refactor[/bold] here[/dim]",
             expand=False,
         ))
 
@@ -212,7 +212,7 @@ class InfoCommand:
                 f"[bold]{pending}[/bold] of [bold]{total}[/bold] files pending review"
             )
             self.console.print(
-                "  [dim]Running [bold]dsg start[/bold] will prompt to resume or discard it.[/dim]"
+                "  [dim]Running [bold]dsg refactor[/bold] will prompt to resume or discard it.[/dim]"
             )
         except Exception:
             self.console.print("  [yellow]⚠[/yellow] A session file exists but could not be read")
@@ -240,7 +240,7 @@ class InfoCommand:
         if provider_ready and rules_ok and has_files:
             self.console.print(
                 f"\n[bold green]✓ Ready.[/bold green] "
-                f"Running [bold]dsg start[/bold] will process style files using "
+                f"Running [bold]dsg refactor[/bold] will process style files using "
                 f"[bold]{cfg.provider}[/bold] / [bold]{cfg.model}[/bold].\n"
             )
         else:

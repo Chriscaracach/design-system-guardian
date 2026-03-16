@@ -256,7 +256,7 @@ class SetupChecker:
         
         if not self.issues:
             self.console.print("\n✓ All checks passed! Ready to use.\n", style="bold green")
-            self.console.print("Run 'dsg start' to begin refactoring.")
+            self.console.print("Run 'dsg refactor' to begin refactoring.")
         else:
             self.console.print(f"\n✗ {len(self.issues)} issue(s) found.\n", style="bold red")
             

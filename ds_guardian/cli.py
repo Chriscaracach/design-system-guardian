@@ -15,7 +15,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:
-  start [target]       Refactor CSS files in target directory (default: current dir)
+  refactor [target]    Refactor CSS files in target directory (default: current dir)
   info [target]        Pre-flight summary: provider, rules, file count, session state
   extract [target]     Extract design tokens from CSS files
   analyze [target]     Design-system health report: metrics, AI analysis, and proposals
@@ -23,7 +23,7 @@ Commands:
   configure            Interactive wizard to set AI provider, model & API key
   check-setup          Verify the configured provider is ready
 
-Options (for 'start' and 'review'):
+Options (for 'refactor' and 'review'):
   --dry-run            Preview changes without writing files
   --auto-apply         Apply all changes without manual review
   --rules <file>       Path to design system file (default: design_system.css)
@@ -41,7 +41,7 @@ Install cloud provider SDKs:
     parser.add_argument(
         'command',
         nargs='?',
-        choices=['start', 'info', 'extract', 'analyze', 'review', 'configure', 'check-setup'],
+        choices=['refactor', 'info', 'extract', 'analyze', 'review', 'configure', 'check-setup'],
         help='Command to run'
     )
 
@@ -146,8 +146,8 @@ Install cloud provider SDKs:
         success = workflow.run()
         sys.exit(0 if success else 1)
 
-    # Handle start command
-    if args.command == 'start':
+    # Handle refactor command
+    if args.command == 'refactor':
         from ds_guardian.workflow import RefactoringWorkflow
         workflow = RefactoringWorkflow(
             target_dir=args.target,

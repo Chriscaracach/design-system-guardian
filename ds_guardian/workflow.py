@@ -310,7 +310,7 @@ class RefactoringWorkflow:
         try:
             self.session = RefactoringSession.load(target_dir=self.target_dir)
         except FileNotFoundError:
-            self.console.print("[red]✗ No saved session found. Run 'dsg start' to begin.[/red]")
+            self.console.print("[red]✗ No saved session found. Run 'dsg refactor' to begin.[/red]")
             return False
         except Exception as e:
             self.console.print(f"[red]✗ Failed to load session: {e}[/red]")
