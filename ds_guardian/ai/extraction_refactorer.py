@@ -1,26 +1,37 @@
 """
 Extraction Refactorer Module
-Uses AI to extract design tokens from raw CSS content
+Uses AI to extract design tokens from a pre-processed structured value map.
+The value map is built by CSSValueAnalyzer and contains frequency + context data
+for each unique CSS value — no raw CSS blobs, no truncation.
 """
 
 import re
 import json
 from typing import Dict, List
 
-from ds_guardian.ai.client import OllamaClient
+from ds_guardian.ai.client import BaseAIClient
 from ds_guardian.core.extractor import DesignToken, ExtractedDesignSystem, DesignSystemExtractor
+from ds_guardian.core.value_analyzer import ValueMap
 
 
-SYSTEM_PROMPT = """You are a design system expert. Your job is to analyze CSS code and extract reusable design tokens.
+SYSTEM_PROMPT = """You are a design system expert. Your job is to analyse a pre-processed summary of CSS values found in a codebase and assign each value a semantic design token name.
+
+You are given a structured list where each line describes one unique CSS value:
+  value="..." frequency=N properties=[prop1 (Nx), prop2 (Nx)] selectors=[sel1, sel2]
+
+- frequency: how many times this value appears across all CSS files
+- properties: which CSS properties use it and how often
+- selectors: example CSS selectors where it appears
 
 Rules:
-1. Identify hardcoded values that should become CSS variables: colors, font sizes, font weights, spacing values, border radii, border widths, box shadows, transitions, and animations.
+1. Use frequency and property/selector context to choose a semantic token name.
+   Example: value="#2563eb" used 14x as background-color in .btn-primary → --color-action-primary
+   Example: value="4px" used 8x as border-radius, 3x in .card → --radius-sm
 2. Group tokens by category: colors, typography, spacing, borders, shadows, motion.
-3. Pick a clear, semantic CSS variable name for each unique value (e.g. --color-primary, --font-size-sm, --space-4).
-4. If the same value appears multiple times, define it only once with the best name.
-5. Do NOT include values that are already CSS variables (var(--...)).
-6. Do NOT include values like 0, none, auto, inherit, initial, or other CSS keywords.
-7. Return ONLY valid JSON — no markdown, no explanations, no code fences.
+3. Each value gets exactly one token — do not create duplicates.
+4. Prefer scale-based names for spacing/typography (--space-4, --font-size-sm) and semantic names for colors (--color-primary, not --color-2563eb).
+5. Do NOT invent values — use the exact value as given.
+6. Return ONLY valid JSON — no markdown, no explanations, no code fences.
 
 Output format (strict JSON):
 {
@@ -46,7 +57,7 @@ Output format (strict JSON):
   ]
 }
 
-Only include categories that have tokens. Use empty arrays for categories with no tokens (they will be omitted).
+Only include categories that have tokens.
 """
 
 
@@ -61,28 +72,29 @@ class ExtractionResult:
 
 
 class CSSExtractionRefactorer:
-    """Extracts design tokens from CSS using AI"""
+    """Extracts design tokens from a structured ValueMap using AI."""
 
-    def __init__(self, client: OllamaClient):
+    def __init__(self, client: BaseAIClient):
         self.client = client
         self._ds_extractor = DesignSystemExtractor()
 
-    def extract(self, combined_css: str) -> ExtractionResult:
+    def extract(self, value_map: ValueMap, existing_css: str = "") -> ExtractionResult:
         """
-        Extract design tokens from combined CSS content.
+        Extract design tokens from a pre-processed ValueMap.
 
         Args:
-            combined_css: All CSS content concatenated
+            value_map: Structured value map from CSSValueAnalyzer
+            existing_css: Raw CSS (used only to collect existing var() declarations)
 
         Returns:
             ExtractionResult with an ExtractedDesignSystem
         """
-        if not combined_css.strip():
-            return ExtractionResult(success=False, error="Empty CSS content")
+        if not value_map.usages:
+            return ExtractionResult(success=False, error="No trackable CSS values found")
 
-        existing_vars = self._ds_extractor.collect_existing_vars(combined_css)
+        existing_vars = self._ds_extractor.collect_existing_vars(existing_css) if existing_css else []
 
-        prompt = self._build_prompt(combined_css)
+        prompt = self._build_prompt(value_map)
         response = self.client.generate(prompt, system=SYSTEM_PROMPT)
 
         if "error" in response:
@@ -121,12 +133,14 @@ class CSSExtractionRefactorer:
 
         return ExtractionResult(success=True, extracted=extracted, tokens_used=tokens_used)
 
-    def _build_prompt(self, css_content: str) -> str:
-        max_chars = 12000
-        truncated = css_content[:max_chars]
-        if len(css_content) > max_chars:
-            truncated += "\n/* ... (truncated for brevity) */"
-        return f"""Analyze the following CSS and extract all reusable design tokens.\n\nCSS:\n{truncated}\n\nReturn ONLY the JSON object as described."""
+    def _build_prompt(self, value_map: ValueMap) -> str:
+        summary = value_map.format_for_prompt(max_values=200)
+        return (
+            "Analyse the following CSS value summary and assign each value a semantic design token name.\n\n"
+            "CSS Value Summary:\n"
+            f"{summary}\n\n"
+            "Return ONLY the JSON object as described."
+        )
 
     def _parse_json_response(self, raw: str) -> dict:
         """Parse JSON from the AI response, stripping any markdown fences."""

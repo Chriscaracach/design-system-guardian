@@ -21,7 +21,7 @@ from ds_guardian.ai.openai_client import OpenAIClient
 from ds_guardian.ai.gemini_client import GeminiClient
 from ds_guardian.ai.config import ModelConfig
 from ds_guardian.ai.refactorer import CSSRefactorer
-from ds_guardian.ai.optimizer import PromptOptimizer
+from ds_guardian.core.substitutor import CSSSubstitutor
 from ds_guardian.ui.diff import DiffGenerator
 from ds_guardian.ui.review import InteractiveReviewer
 from ds_guardian.ui.splash import SplashScreen
@@ -59,12 +59,12 @@ class RefactoringWorkflow:
         self.diff_generator = DiffGenerator()
         self.writer = FileWriter(target_dir=self.target_dir)
         self.session = RefactoringSession(target_dir=self.target_dir)
-        self.optimizer = PromptOptimizer()
         
         self.files = []
         self.rules = None
         self.client = None
         self.refactorer = None
+        self.substitutor = None
         self._bg_error = None
     
     def run(self):
@@ -221,6 +221,7 @@ class RefactoringWorkflow:
                 return False
 
             self.refactorer = CSSRefactorer(self.client)
+            self.substitutor = CSSSubstitutor(self.rules)
             return True
 
         except Exception as e:
@@ -229,15 +230,15 @@ class RefactoringWorkflow:
     
     
     def _process_all_files(self, splash=None):
-        """Process all files in parallel using ThreadPoolExecutor"""
-        all_css_content = ""
-        for file in self.files:
-            with open(file.path, 'r', encoding='utf-8') as f:
-                all_css_content += f.read() + "\n"
+        """Process all files using the hybrid script+AI pipeline.
 
-        filtered_rules = self.optimizer.filter_relevant_tokens(all_css_content, self.rules)
-        design_tokens = RulesParser(self.rules_file).generate_prompt_context(filtered_rules)
+        Phase 1 (script): CSSSubstitutor applies deterministic exact-match
+        replacements for every value that maps to exactly one token.
 
+        Phase 2 (AI, optional): CSSRefactorer.resolve_ambiguous() is called
+        only when a file has declarations whose value matches 2+ token candidates.
+        Files with no ambiguous cases skip AI entirely.
+        """
         session_lock = threading.Lock()
         completed_count = [0]
 
@@ -245,11 +246,25 @@ class RefactoringWorkflow:
             with open(file.path, 'r', encoding='utf-8') as f:
                 original_css = f.read()
 
-            result = self.refactorer.refactor(original_css, design_tokens)
-            if not result.success:
-                return None
+            # Phase 1 — deterministic script substitution
+            sub_result = self.substitutor.substitute(original_css)
 
-            diff_lines = self.diff_generator.generate(original_css, result.refactored_css)
+            refactored_css = sub_result.css
+            tokens_used = 0
+
+            # Phase 2 — AI only for ambiguous declarations
+            if sub_result.has_ambiguous:
+                ai_result = self.refactorer.resolve_ambiguous(sub_result.ambiguous)
+                if ai_result.success and ai_result.decisions:
+                    refactored_css = self.substitutor.apply_ai_decisions(
+                        refactored_css,
+                        ai_result.decisions,
+                        sub_result.ambiguous,
+                    )
+                    tokens_used = ai_result.tokens_used
+
+            # Only keep the file if something actually changed
+            diff_lines = self.diff_generator.generate(original_css, refactored_css)
             diff_stats = self.diff_generator.get_stats(diff_lines)
             if not diff_stats['has_changes']:
                 return None
@@ -258,8 +273,8 @@ class RefactoringWorkflow:
                 file_path=str(file.path),
                 relative_path=str(file.relative_path),
                 original_css=original_css,
-                refactored_css=result.refactored_css,
-                tokens_used=result.tokens_used,
+                refactored_css=refactored_css,
+                tokens_used=tokens_used,
                 lines_added=diff_stats['added'],
                 lines_removed=diff_stats['removed'],
                 status='pending'

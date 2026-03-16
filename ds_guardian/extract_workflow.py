@@ -9,7 +9,9 @@ from rich.prompt import Confirm
 
 from ds_guardian.core.scanner import FileScanner
 from ds_guardian.core.extractor import DesignSystemExtractor, CATEGORY_FILES, CATEGORY_ORDER
+from ds_guardian.core.value_analyzer import CSSValueAnalyzer
 from ds_guardian.ai.client import OllamaClient
+from ds_guardian.ai.config import ModelConfig
 from ds_guardian.ai.extraction_refactorer import CSSExtractionRefactorer
 from ds_guardian.ui.extraction_review import ExtractionReviewer
 from ds_guardian.ui.splash import SplashScreen
@@ -21,14 +23,15 @@ class ExtractWorkflow:
     def __init__(
         self,
         target_dir: str,
-        model: str = "qwen2.5-coder:0.5b",
+        model_config: ModelConfig = None,
     ):
         self.target_dir = Path(target_dir).resolve()
-        self.model = model
+        self.model_config = model_config or ModelConfig.load()
 
         self.console = Console()
         self.scanner = FileScanner(target_dir)
         self.ds_extractor = DesignSystemExtractor()
+        self.value_analyzer = CSSValueAnalyzer()
         self.reviewer = ExtractionReviewer(self.console)
 
         self._bg_error = None
@@ -36,6 +39,7 @@ class ExtractWorkflow:
         self._extracted = None
         self._files = []
         self._tokens_used = 0
+        self._value_count = 0
 
     def run(self) -> bool:
         """Run the extraction workflow"""
@@ -51,14 +55,26 @@ class ExtractWorkflow:
                         return False
 
                     splash.set_status("Connecting to AI model...")
-                    client = OllamaClient(model=self.model)
+                    cfg = self.model_config
+                    from ds_guardian.ai.anthropic_client import AnthropicClient
+                    from ds_guardian.ai.openai_client import OpenAIClient
+                    from ds_guardian.ai.gemini_client import GeminiClient
+                    api_key = cfg.resolved_api_key()
+                    if cfg.provider == 'anthropic':
+                        client = AnthropicClient(api_key=api_key, model=cfg.model)
+                    elif cfg.provider == 'openai':
+                        client = OpenAIClient(api_key=api_key, model=cfg.model)
+                    elif cfg.provider == 'gemini':
+                        client = GeminiClient(api_key=api_key, model=cfg.model)
+                    else:
+                        client = OllamaClient(model=cfg.model)
                     if not client.is_available():
-                        self._bg_error = "Could not connect to Ollama. Is it running? Try: ollama serve"
+                        self._bg_error = "Could not connect to AI provider. Run 'dsg check-setup' to diagnose."
                         return False
 
                     refactorer = CSSExtractionRefactorer(client)
 
-                    splash.set_status("Reading CSS files...")
+                    splash.set_status("Analysing CSS values...")
                     combined_css = ""
                     for i, f in enumerate(self._files):
                         splash.set_progress(i, len(self._files))
@@ -67,8 +83,11 @@ class ExtractWorkflow:
                         except Exception:
                             continue
 
+                    value_map = self.value_analyzer.analyze_files(self._files)
+                    self._value_count = len(value_map.usages)
+
                     splash.set_status("Extracting design tokens with AI...")
-                    result = refactorer.extract(combined_css)
+                    result = refactorer.extract(value_map, existing_css=combined_css)
                     if not result.success:
                         self._bg_error = f"Extraction failed: {result.error}"
                         return False

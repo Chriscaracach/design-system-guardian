@@ -18,6 +18,7 @@ Commands:
   start [target]       Refactor CSS files in target directory (default: current dir)
   info [target]        Pre-flight summary: provider, rules, file count, session state
   extract [target]     Extract design tokens from CSS files
+  analyze [target]     Design-system health report: metrics, AI analysis, and proposals
   review               Resume a saved refactoring session
   configure            Interactive wizard to set AI provider, model & API key
   check-setup          Verify the configured provider is ready
@@ -40,7 +41,7 @@ Install cloud provider SDKs:
     parser.add_argument(
         'command',
         nargs='?',
-        choices=['start', 'info', 'extract', 'review', 'configure', 'check-setup'],
+        choices=['start', 'info', 'extract', 'analyze', 'review', 'configure', 'check-setup'],
         help='Command to run'
     )
 
@@ -129,6 +130,18 @@ Install cloud provider SDKs:
         target = args.output if args.output else args.target
         workflow = ExtractWorkflow(
             target_dir=target,
+            model_config=model_config,
+        )
+        success = workflow.run()
+        sys.exit(0 if success else 1)
+
+    # Handle analyze command
+    if args.command == 'analyze':
+        from ds_guardian.analyze_workflow import AnalyzeWorkflow
+        workflow = AnalyzeWorkflow(
+            target_dir=args.target,
+            rules_file=args.rules,
+            model_config=model_config,
         )
         success = workflow.run()
         sys.exit(0 if success else 1)
