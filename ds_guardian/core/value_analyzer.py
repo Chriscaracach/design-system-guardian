@@ -35,30 +35,44 @@ class ValueUsage:
     properties: Dict[str, int] = field(default_factory=dict)
     selectors: List[str] = field(default_factory=list)
     files: List[str] = field(default_factory=list)
+    code_examples: List[Dict[str, str]] = field(default_factory=list)
 
-    def add_occurrence(self, prop: str, selector: str, file_path: str):
+    def add_occurrence(self, prop: str, selector: str, file_path: str, code_snippet: str = ""):
         self.frequency += 1
         self.properties[prop] = self.properties.get(prop, 0) + 1
         if selector and selector not in self.selectors:
             self.selectors.append(selector)
         if file_path not in self.files:
             self.files.append(file_path)
+        if code_snippet and len(self.code_examples) < 5:
+            self.code_examples.append({
+                "file": file_path,
+                "selector": selector,
+                "property": prop,
+                "snippet": code_snippet
+            })
 
     def top_properties(self, n: int = 3) -> List[str]:
         return sorted(self.properties, key=lambda p: self.properties[p], reverse=True)[:n]
 
-    def format_for_prompt(self) -> str:
+    def format_for_prompt(self, include_examples: bool = False) -> str:
         props = ", ".join(
             f"{p} ({c}x)" for p, c in
             sorted(self.properties.items(), key=lambda x: x[1], reverse=True)[:3]
         )
         selectors_preview = ", ".join(self.selectors[:3])
-        return (
+        base = (
             f'value="{self.value}" '
             f'frequency={self.frequency} '
             f'properties=[{props}] '
             f'selectors=[{selectors_preview}]'
         )
+        if include_examples and self.code_examples:
+            examples = "\n  Examples:"
+            for ex in self.code_examples[:3]:
+                examples += f"\n    {ex['file']}: {ex['selector']} {{ {ex['property']}: {self.value}; }}"
+            return base + examples
+        return base
 
 
 @dataclass
@@ -66,11 +80,11 @@ class ValueMap:
     """Complete structured map of all values found in a CSS codebase"""
     usages: Dict[str, ValueUsage] = field(default_factory=dict)
 
-    def add(self, value: str, prop: str, selector: str, file_path: str):
+    def add(self, value: str, prop: str, selector: str, file_path: str, code_snippet: str = ""):
         normalised = _normalise_value(value)
         if normalised not in self.usages:
             self.usages[normalised] = ValueUsage(value=normalised)
-        self.usages[normalised].add_occurrence(prop, selector, file_path)
+        self.usages[normalised].add_occurrence(prop, selector, file_path, code_snippet)
 
     def get(self, value: str) -> Optional[ValueUsage]:
         return self.usages.get(_normalise_value(value))
@@ -223,4 +237,6 @@ class CSSValueAnalyzer:
                 sub_values = _split_shorthand(prop, raw_value)
                 for val in sub_values:
                     if not _should_skip(val):
-                        value_map.add(val, prop, selector, source)
+                        # Create a code snippet showing the actual CSS declaration
+                        snippet = f"{prop}: {raw_value}"
+                        value_map.add(val, prop, selector, source, snippet)

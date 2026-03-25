@@ -15,29 +15,31 @@ from ds_guardian.core.rules import RefactoringRules
 
 
 SYSTEM_PROMPT = """You are a senior design systems engineer. You are given:
-1. A summary of CSS values found in a codebase (with frequency and usage context)
+1. A summary of CSS values found in a codebase with ACTUAL CODE EXAMPLES from the project
 2. The existing design tokens already defined in design-system.css
 3. Script-computed metrics: coverage %, orphaned values, unused tokens, duplicate tokens
 
 Your job is to produce TWO sections:
 
 --- ANALYSIS ---
-Observations about the health and quality of the current design system:
-- Near-duplicate values that are used interchangeably (e.g. #1a1a1a vs #1c1c1c)
-- Token naming inconsistencies (mixing conventions like --btn-blue and --color-primary)
-- Scale gaps or discontinuities (e.g. spacing jumps from 8px to 24px with nothing in between)
+Observations about the health and quality of THIS SPECIFIC design system:
+- Near-duplicate values that are used interchangeably (reference actual values from the codebase)
+- Token naming inconsistencies (cite specific token names from the provided list)
+- Scale gaps or discontinuities (reference actual values in the spacing/sizing scales)
 - Categories that are over-specified or under-specified
-- Anti-patterns (mixing px and rem in the same scale, magic numbers, etc.)
+- Anti-patterns (cite specific examples from the code snippets provided)
 
 --- PROPOSALS ---
-Concrete, actionable improvements. Each proposal must be self-contained and specific:
-- RENAME: "--old-name" → "--new-name" (reason)
-- MERGE: "--token-a" and "--token-b" have the same value — keep "--preferred-name"
-- ADD: "--new-token: value" to cover orphaned value used Nx across the codebase
-- REMOVE: "--unused-token" is defined but never referenced in the codebase
-- RESTRUCTURE: suggest better category grouping if the current structure is fragmented
+Concrete, actionable improvements with CODE EXAMPLES. Each proposal must reference actual code from this project:
+- RENAME: "--old-name" → "--new-name" (reason, with example usage)
+- MERGE: "--token-a" and "--token-b" have the same value — keep "--preferred-name" (show where they're used)
+- ADD: "--new-token: value" to replace orphaned value (show actual selectors where it appears, e.g., ".button { color: #ff0000; }" → ".button { color: var(--new-token); }")
+- REMOVE: "--unused-token" is defined but never referenced
+- REFACTOR: Show before/after code snippets for suggested changes
 
-Be direct and specific. Prioritise by impact (most frequent values / biggest inconsistencies first).
+Be SPECIFIC to this codebase. Reference actual file names, selectors, and values you see in the data.
+Prioritise by impact (most frequent values / biggest inconsistencies first).
+Include concrete code examples in your proposals showing the current state and proposed changes.
 Do not output JSON. Write plain text with the two clearly labelled sections."""
 
 
@@ -218,6 +220,11 @@ class DesignSystemAnalyzer:
             lines.append("\nTop orphaned values (hardcoded, no token):")
             for o in metrics.orphaned_values[:20]:
                 lines.append(f"  value={o['value']} freq={o['frequency']} props={o['properties']}")
+                # Add code examples for orphaned values if available
+                usage = value_map.usages.get(o['value'])
+                if usage and usage.code_examples:
+                    for ex in usage.code_examples[:2]:
+                        lines.append(f"    → {ex['file']}: {ex['selector']} {{ {ex['snippet']}; }}")
 
         lines.append("\n=== EXISTING TOKENS ===")
         from ds_guardian.core.rules import RulesParser
@@ -225,8 +232,15 @@ class DesignSystemAnalyzer:
         token_text = _format_token_list(rules)
         lines.append(token_text)
 
-        lines.append("\n=== CSS VALUE SUMMARY (top 100 by frequency) ===")
-        lines.append(value_map.format_for_prompt(max_values=100))
+        lines.append("\n=== CSS VALUE SUMMARY (top 50 by frequency with code examples) ===")
+        # Include code examples for top values to give AI concrete context
+        sorted_usages = sorted(
+            value_map.usages.values(),
+            key=lambda u: u.frequency,
+            reverse=True
+        )[:50]
+        for usage in sorted_usages:
+            lines.append(usage.format_for_prompt(include_examples=True))
 
         lines.append("\nNow produce the ANALYSIS and PROPOSALS sections.")
         return "\n".join(lines)

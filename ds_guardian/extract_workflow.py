@@ -24,9 +24,11 @@ class ExtractWorkflow:
         self,
         target_dir: str,
         model_config: ModelConfig = None,
+        mode: str = 'simple',
     ):
         self.target_dir = Path(target_dir).resolve()
         self.model_config = model_config or ModelConfig.load()
+        self.mode = mode
 
         self.console = Console()
         self.scanner = FileScanner(target_dir)
@@ -155,12 +157,13 @@ class ExtractWorkflow:
     def _list_output_files(self):
         """Print the list of files that will be written"""
         self.console.print("  [cyan]design_system.css[/cyan] [dim](full consolidated file)[/dim]")
-        for cat in CATEGORY_ORDER:
-            tokens = self._extracted.tokens_by_category.get(cat, [])
-            if not tokens:
-                continue
-            filename = CATEGORY_FILES[cat]
-            self.console.print(f"  [cyan]{filename}[/cyan] [dim]({len(tokens)} tokens)[/dim]")
+        if self.mode == 'full':
+            for cat in CATEGORY_ORDER:
+                tokens = self._extracted.tokens_by_category.get(cat, [])
+                if not tokens:
+                    continue
+                filename = CATEGORY_FILES[cat]
+                self.console.print(f"  [cyan]{filename}[/cyan] [dim]({len(tokens)} tokens)[/dim]")
 
     def _write_files(self):
         """Write design_system.css and category files"""
@@ -175,19 +178,20 @@ class ExtractWorkflow:
         except Exception as e:
             errors.append(f"design_system.css: {e}")
 
-        # Write category files
-        for cat in CATEGORY_ORDER:
-            tokens = self._extracted.tokens_by_category.get(cat, [])
-            if not tokens:
-                continue
-            filename = CATEGORY_FILES[cat]
-            cat_path = self.target_dir / filename
-            try:
-                content = self.ds_extractor.build_category_css(cat, tokens)
-                cat_path.write_text(content, encoding="utf-8")
-                written.append(filename)
-            except Exception as e:
-                errors.append(f"{filename}: {e}")
+        # Write category files only in full mode
+        if self.mode == 'full':
+            for cat in CATEGORY_ORDER:
+                tokens = self._extracted.tokens_by_category.get(cat, [])
+                if not tokens:
+                    continue
+                filename = CATEGORY_FILES[cat]
+                cat_path = self.target_dir / filename
+                try:
+                    content = self.ds_extractor.build_category_css(cat, tokens)
+                    cat_path.write_text(content, encoding="utf-8")
+                    written.append(filename)
+                except Exception as e:
+                    errors.append(f"{filename}: {e}")
 
         self.console.print()
         for f in written:

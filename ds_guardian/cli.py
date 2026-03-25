@@ -17,7 +17,7 @@ def main():
 Commands:
   refactor [target]    Refactor CSS files in target directory (default: current dir)
   info [target]        Pre-flight summary: provider, rules, file count, session state
-  extract [target]     Extract design tokens from CSS files
+  extract [target]     Extract design tokens from CSS files (use --mode to control output)
   analyze [target]     Design-system health report: metrics, AI analysis, and proposals
   review               Resume a saved refactoring session
   configure            Interactive wizard to set AI provider, model & API key
@@ -29,6 +29,7 @@ Options (for 'refactor' and 'review'):
   --rules <file>       Path to design system file (default: design_system.css)
   --workers <n>        Parallel AI workers (default: 3)
   --output <dir>       Output directory for extracted tokens (extract only)
+  --mode <mode>        Extract mode: 'simple' (default, design_system.css only) or 'full' (all category files)
 
 Install cloud provider SDKs:
   pip install "ds-guardian[anthropic]"
@@ -85,6 +86,14 @@ Install cloud provider SDKs:
         help='Output directory for extracted token files (default: target directory)'
     )
 
+    parser.add_argument(
+        '--mode',
+        type=str,
+        choices=['simple', 'full'],
+        default='simple',
+        help='Extract mode: simple (design_system.css only) or full (all category files)'
+    )
+
     args = parser.parse_args()
 
     # Handle configure command
@@ -131,6 +140,7 @@ Install cloud provider SDKs:
         workflow = ExtractWorkflow(
             target_dir=target,
             model_config=model_config,
+            mode=args.mode,
         )
         success = workflow.run()
         sys.exit(0 if success else 1)
